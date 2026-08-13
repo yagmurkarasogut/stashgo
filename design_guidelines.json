@@ -1,0 +1,187 @@
+{
+  "app_name": "Loom",
+  "personality": "6 Glass / Luxe DARK",
+  "personality_one_liner": "A cinematic, deeply immersive personal media vault where the content is the hero and the UI fades into glass and shadow.",
+  "color": {
+    "surface": "#0B0D10",
+    "onSurface": "#F5F5F5",
+    "surfaceSecondary": "#16191E",
+    "onSurfaceSecondary": "#B0B5C0",
+    "surfaceTertiary": "#1F232A",
+    "onSurfaceTertiary": "#8A919E",
+    "surfaceInverse": "#F5F5F5",
+    "onSurfaceInverse": "#0B0D10",
+    "brand": "#D4B886",
+    "brandPrimary": "#D4B886",
+    "onBrandPrimary": "#12100B",
+    "brandSecondary": "#B89966",
+    "onBrandSecondary": "#0F0D09",
+    "brandTertiary": "#4A3F2C",
+    "onBrandTertiary": "#D4B886",
+    "success": "#3E7B5A",
+    "onSuccess": "#D9EFE3",
+    "warning": "#A37A33",
+    "onWarning": "#F5E6CD",
+    "error": "#8F3A3C",
+    "onError": "#F8DADA",
+    "info": "#5C6A7A",
+    "onInfo": "#E3E9F0",
+    "border": "#2A2E35",
+    "borderStrong": "#3B4049",
+    "divider": "#1F232A"
+  },
+  "typography": {
+    "displayFontFamily": "Fraunces",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0 (blur replaces shadow)",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Tab bar",
+      "Bottom sheet handles",
+      "Sticky headers over scrolling grids",
+      "Featured/Hero poster cards with text overlay",
+      "FAB"
+    ],
+    "dont's": [
+      "Form fields",
+      "Body text regions",
+      "Tiny chips in dense lists",
+      "Any surface without at least 75% dark tint underneath"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Auth",
+      "purpose": "Immerse the user in the cinematic mood while providing fast access.",
+      "states": {
+        "loading": "Blur over hero image with spinner",
+        "empty": "N/A",
+        "error": "Glass toast at the top"
+      },
+      "layout": "Full-bleed poster image with top-to-bottom dark gradient scrim. Glass container at the bottom holding Google/Apple auth buttons."
+    },
+    {
+      "name": "Home",
+      "purpose": "A personalized feed of recently added AI discoveries and collections.",
+      "states": {
+        "loading": "Skeleton grids",
+        "empty": "Empty theater image + 'Your memory vault is empty' + primary CTA.",
+        "error": "Retry button centered."
+      },
+      "layout": "Poster-driven horizontal carousels (Letterboxd style) with minimal chrome. Generous 'lg' spacing between sections. Sticky FAB at bottom right for Add Discovery. Glass bottom tabs."
+    },
+    {
+      "name": "Add Discovery",
+      "purpose": "Fastest possible flow to save a URL or text.",
+      "states": {
+        "loading": "Processing state with AI sparkle icon",
+        "empty": "N/A",
+        "error": "Red inline text below input."
+      },
+      "layout": "Bottom sheet pattern popping over the Home screen. Minimalist 'Pocket' style: single text input + 'Save to List' primary CTA. Quick close."
+    },
+    {
+      "name": "Personal Library",
+      "purpose": "Browse the entire saved collection visually.",
+      "states": {
+        "loading": "Grid of shimmers",
+        "empty": "Empty theater image.",
+        "error": "Retry layout."
+      },
+      "layout": "3-column edge-to-edge poster grid with 4pt gap (md/lg spacing on edges). Sticky glass header with inline filters (Movies / TV / Custom). No text on grid, just posters to mimic a real shelf."
+    },
+    {
+      "name": "Movie Detail",
+      "purpose": "Immersive display of a specific title and the user's notes.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "N/A",
+        "error": "Error message."
+      },
+      "layout": "Edge-to-edge cover image with strong vertical gradient scrim (transparent to 80% surfaceInverse). Title superimposed over the scrim in Fraunces. Glass layered cards for Cast and Discovery Source (where the user found it). Sticky CTA 'Log Watch Status' pinned at bottom."
+    },
+    {
+      "name": "Semantic Search",
+      "purpose": "Natural language chat-style input to query the vault.",
+      "states": {
+        "loading": "Subtle pulsing text 'Scanning vault...'",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Conversational UI layout. Clean input field at the bottom within a KeyboardAvoidingView. Results appear above as rich poster cards with glass overlays explaining *why* it matched (e.g., 'Matches: time travel')."
+    }
+  ],
+  "images": {
+    "google_logo": {
+      "url": "https://images.unsplash.com/photo-1662947190722-5d272f82a526?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHwxfHxHb29nbGUlMjBsb2dvJTIwUE5HfGVufDB8fHx8MTc4NjYyNzA2OHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Google logo PNG"
+    },
+    "apple_logo": {
+      "url": "https://images.unsplash.com/photo-1621768216002-5ac171876625?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwxfHxBcHBsZSUyMGxvZ28lMjBQTkd8ZW58MHx8fHwxNzg2NjI3MDY4fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Apple logo PNG"
+    },
+    "poster_1": {
+      "url": "https://images.pexels.com/photos/19830143/pexels-photo-19830143.jpeg",
+      "alt": "Cinematic poster of woman in lighting"
+    },
+    "poster_2": {
+      "url": "https://images.unsplash.com/photo-1782899937486-e0eee1d0065c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwzfHxjaW5lbWF0aWMlMjBtb3ZpZSUyMHBvc3RlciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4NjYyNzA2OHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Tarantino poster aesthetic"
+    },
+    "poster_3": {
+      "url": "https://images.unsplash.com/photo-1782020934325-cfe4cea4fd9c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MDV8MHwxfHNlYXJjaHwyfHxjaW5lbWF0aWMlMjBtb3ZpZSUyMHBvc3RlciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4NjYyNzA2OHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Hannibal movie poster aesthetic"
+    },
+    "empty_theater": {
+      "url": "https://images.unsplash.com/photo-1761344580244-767bc4e2e8c8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwyfHxlbXB0eSUyMG1vdmllJTIwdGhlYXRlciUyMHNlYXRpbmclMjBkYXJrfGVufDB8fHx8MTc4NjYyNzA2OHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Empty dark theater seating"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Always apply a top-to-bottom linear gradient scrim when text overlays an image, fading to ≥75% surface/surfaceInverse at the bottom to ensure WCAG AA contrast.",
+    "BANNED: Any hue of blue, indigo, violet, or purple. Stick strictly to the Charcoal Slate + Antique Gold palette provided.",
+    "Do NOT use pure #FFFFFF for text; use #F5F5F5 or #EAEAEA as defined in onSurface to reduce OLED eye strain.",
+    "Use 'Phosphor' icons consistently. Do not mix weights. Keep them either all outlined or all filled (except tab bar states).",
+    "For the Personal Library grid, replicate a Letterboxd-style layout: tight 3-column posters with no text underneath, letting the cover art do the talking.",
+    "Any bottom sheets or floating elements must use a frosted glass effect (expo-blur) with a tinted background of at least 70% opacity."
+  ]
+}

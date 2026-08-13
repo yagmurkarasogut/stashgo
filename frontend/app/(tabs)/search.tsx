@@ -1,0 +1,146 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { api, LibraryEntry } from '@/src/api/client';
+import { colors, spacing, radius, IMAGES } from '@/src/theme';
+
+type Match = LibraryEntry & { match_reason?: string; match_score?: number };
+
+const SUGGESTIONS = [
+  'Movie about time travel',
+  "Nolan movie with black holes",
+  'That thriller I saved last month',
+  'Dark comedy TV shows',
+];
+
+export default function Search() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [ran, setRan] = useState(false);
+
+  const run = async (query?: string) => {
+    const query2 = (query ?? q).trim();
+    if (!query2) return;
+    setQ(query2);
+    setLoading(true); setRan(true);
+    try {
+      const res = await api.post<{ query: string; results: Match[] }>('/search', { query: query2 });
+      setResults(res.results);
+    } catch (e) {
+      console.warn('search failed', e);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.root} testID="search-screen">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.title}>Semantic Search</Text>
+          <Text style={styles.subtitle}>Ask in your own words. Loom understands.</Text>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+          {!ran && (
+            <View style={styles.suggestBox}>
+              {SUGGESTIONS.map((s) => (
+                <Pressable key={s} testID={`search-suggest-${s}`} onPress={() => run(s)} style={styles.suggestPill}>
+                  <Ionicons name="sparkles" size={12} color={colors.brand} />
+                  <Text style={styles.suggestText}>{s}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {loading && (
+            <View style={{ padding: spacing.xxl, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.brand} />
+              <Text style={styles.scanning}>Scanning vault…</Text>
+            </View>
+          )}
+
+          {ran && !loading && results.length === 0 && (
+            <View style={styles.emptyResults}>
+              <Ionicons name="search-outline" size={40} color={colors.onSurfaceTertiary} />
+              <Text style={styles.emptyText}>No matches. Try broader wording.</Text>
+            </View>
+          )}
+
+          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, marginTop: spacing.md }}>
+            {results.map((r) => (
+              <Pressable
+                key={r.entry_id}
+                testID={`search-result-${r.entry_id}`}
+                onPress={() => router.push(`/movie/${r.entry_id}`)}
+                style={styles.resultCard}
+              >
+                <Image source={{ uri: r.poster_url || IMAGES.posterFallback }} style={styles.resultImg} contentFit="cover" />
+                <View style={styles.resultBody}>
+                  <Text style={styles.resultTitle} numberOfLines={1}>{r.title}</Text>
+                  <Text style={styles.resultMeta}>{r.media_type.toUpperCase()} {r.year ? `· ${r.year}` : ''} {r.director ? `· ${r.director}` : ''}</Text>
+                  {r.match_reason ? (
+                    <View style={styles.reasonPill}>
+                      <Ionicons name="sparkles" size={11} color={colors.brand} />
+                      <Text style={styles.reasonText} numberOfLines={2}>{r.match_reason}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+
+        <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 }]}>
+          <View style={styles.inputWrap}>
+            <Ionicons name="sparkles-outline" size={18} color={colors.brand} style={{ marginLeft: spacing.md }} />
+            <TextInput
+              testID="search-input"
+              placeholder="Ask about your vault…"
+              placeholderTextColor={colors.onSurfaceTertiary}
+              value={q}
+              onChangeText={setQ}
+              onSubmitEditing={() => run()}
+              returnKeyType="search"
+              style={styles.input}
+            />
+            <Pressable testID="search-submit" onPress={() => run()} style={styles.sendBtn}>
+              <Ionicons name="arrow-up" size={18} color={colors.onBrand} />
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.surface },
+  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  title: { color: colors.onSurface, fontSize: 26, fontWeight: '700' },
+  subtitle: { color: colors.onSurfaceTertiary, fontSize: 13, marginTop: spacing.xs },
+  suggestBox: { paddingHorizontal: spacing.lg, marginTop: spacing.lg, gap: spacing.sm, flexDirection: 'row', flexWrap: 'wrap' },
+  suggestPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill },
+  suggestText: { color: colors.onSurfaceSecondary, fontSize: 12 },
+  scanning: { color: colors.onSurfaceTertiary, marginTop: spacing.md, fontSize: 13 },
+  emptyResults: { alignItems: 'center', padding: spacing.xxl, gap: spacing.md },
+  emptyText: { color: colors.onSurfaceTertiary, fontSize: 13 },
+  resultCard: { flexDirection: 'row', backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  resultImg: { width: 80, height: 120 },
+  resultBody: { flex: 1, padding: spacing.md, justifyContent: 'center' },
+  resultTitle: { color: colors.onSurface, fontSize: 15, fontWeight: '700' },
+  resultMeta: { color: colors.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
+  reasonPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.brandTertiary, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.sm, marginTop: spacing.sm, alignSelf: 'flex-start', maxWidth: '100%' },
+  reasonText: { color: colors.brand, fontSize: 11, flexShrink: 1 },
+  inputBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 0.5 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  input: { flex: 1, color: colors.onSurface, fontSize: 14, paddingHorizontal: spacing.md, paddingVertical: 12 },
+  sendBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', marginRight: 5 },
+});
