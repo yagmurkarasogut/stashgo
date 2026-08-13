@@ -8,21 +8,32 @@ import json
 import re
 import uuid
 import base64
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import httpx
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-SYSTEM_PROMPT = """You are Loom's AI curator — an expert at identifying movies and TV shows referenced in social media posts, articles, captions, screenshots, and URLs.
+SYSTEM_PROMPT = """You are Loom's AI curator — a meticulous expert at identifying the SPECIFIC movie or TV show a piece of social content is about.
 
-Given a piece of content, your job is to:
-1. Identify EVERY movie or TV show mentioned or referenced (by title, character, actor, franchise, or strong visual clue).
-2. Guess the media_type ("movie" or "tv") — pick the most likely one when ambiguous.
-3. Provide a confidence score 0.0-1.0 for each detection.
-4. Extract a short cleaned caption (max 200 chars) that captures the essence of the content.
-5. Provide a 1-sentence ai_summary describing why this content matters to a movie lover.
+You will be given structured SIGNALS extracted from a social post or web page: the page/video TITLE, DESCRIPTION/CAPTION, AUTHOR/channel, HASHTAGS, and any raw on-page TEXT. Weigh them together — the title and caption usually name or strongly hint the title; hashtags (e.g. #theinvitation) and @mentions are high-signal; the author/channel gives context.
+
+CRITICAL ACCURACY RULES:
+1. NEVER invent or hallucinate a title. Only return titles you can actually justify from the signals. If the signals are too thin to name a title, return an EMPTY detections array — that is the correct answer, not a guess.
+2. Do NOT confuse similarly-themed films. If a caption clearly says "The Invitation", the answer is "The Invitation" — never substitute a different body-horror/thriller just because the vibe is similar.
+3. For each detection give an honest confidence 0.0-1.0:
+   - 0.85-1.0: title explicitly named in title/caption/hashtag.
+   - 0.6-0.85: strongly implied (unique character/actor/plot + one corroborating signal).
+   - 0.4-0.6: plausible but ambiguous.
+   - below 0.4: do not return as a primary detection.
+4. When you are NOT highly confident (confidence < 0.75), populate an "alternatives" array with up to 2 OTHER real, plausible titles the content could be, each with its own confidence. List the single best guess as "title" and the runner-ups in "alternatives". If highly confident, "alternatives" MUST be an empty array.
+5. Every candidate (primary + alternatives) must be a REAL, existing movie or TV show. If you cannot name real candidates, omit the detection entirely.
+
+Also produce:
+- caption: a short cleaned caption (<=200 chars) reflecting the post.
+- extracted_text: the key text signals you used (<=1500 chars).
+- ai_summary: one sentence on why this matters to a movie lover.
 
 Return STRICT JSON only, no markdown fences, no preamble. Schema:
 {
@@ -34,12 +45,13 @@ Return STRICT JSON only, no markdown fences, no preamble. Schema:
       "title": "string",
       "media_type": "movie" | "tv",
       "confidence": 0.0-1.0,
-      "reason": "string (why you detected this)"
+      "reason": "string (which signals justify this)",
+      "alternatives": [
+        {"title": "string", "media_type": "movie"|"tv", "confidence": 0.0-1.0}
+      ]
     }
   ]
-}
-
-If nothing recognizable, return empty detections array. Never invent titles. Be conservative — 0.4 minimum confidence."""
+}"""
 
 
 def _extract_json(text: str) -> Optional[Dict]:
@@ -62,22 +74,119 @@ def _extract_json(text: str) -> Optional[Dict]:
     return None
 
 
-async def _fetch_url_content(url: str) -> str:
-    """Best-effort fetch of a URL's HTML/text. Returns raw text (may be empty)."""
+def _meta(html: str, *keys: str) -> str:
+    """Extract a meta tag content by property/name (first match)."""
+    for key in keys:
+        # property="og:title" content="..."  OR  name="..." content="..."
+        for pat in (
+            rf'<meta[^>]+(?:property|name)=["\']{re.escape(key)}["\'][^>]*content=["\']([^"\']*)["\']',
+            rf'<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']{re.escape(key)}["\']',
+        ):
+            m = re.search(pat, html, re.IGNORECASE)
+            if m and m.group(1).strip():
+                return _unescape(m.group(1).strip())
+    return ""
+
+
+def _unescape(s: str) -> str:
+    import html as _h
+    return _h.unescape(s)
+
+
+def _extract_hashtags(*texts: str) -> List[str]:
+    tags = []
+    for t in texts:
+        tags += re.findall(r"#([A-Za-z0-9_]{2,40})", t or "")
+    # de-dupe, keep order
+    seen, out = set(), []
+    for tag in tags:
+        low = tag.lower()
+        if low not in seen:
+            seen.add(low)
+            out.append(tag)
+    return out[:20]
+
+
+async def _youtube_oembed(url: str, client: httpx.AsyncClient) -> Dict:
     try:
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
-            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 LoomBot/1.0"})
-            content_type = r.headers.get("content-type", "")
-            if "text" in content_type or "html" in content_type or "json" in content_type:
-                # crude HTML strip
-                txt = re.sub(r"<script[^>]*>.*?</script>", " ", r.text, flags=re.DOTALL | re.IGNORECASE)
-                txt = re.sub(r"<style[^>]*>.*?</style>", " ", txt, flags=re.DOTALL | re.IGNORECASE)
-                txt = re.sub(r"<[^>]+>", " ", txt)
-                txt = re.sub(r"\s+", " ", txt).strip()
-                return txt[:6000]
+        r = await client.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+        )
+        if r.status_code == 200:
+            j = r.json()
+            return {"title": j.get("title", ""), "author": j.get("author_name", "")}
     except Exception:
         pass
-    return ""
+    return {}
+
+
+async def fetch_url_signals(url: str) -> Dict:
+    """Extract structured signals (title, description, author, hashtags, text)
+    from a social/web URL. Uses OG/Twitter meta tags + oEmbed where possible.
+    JS-rendered pages (IG/TikTok) still expose these meta tags server-side."""
+    signals: Dict[str, Any] = {
+        "url": url, "title": "", "description": "", "author": "",
+        "hashtags": [], "text": "", "platform": detect_source_platform(url),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (compatible; LoomBot/1.0; +https://loom.app) facebookexternalhit/1.1",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            if signals["platform"] == "youtube":
+                yo = await _youtube_oembed(url, client)
+                signals["title"] = yo.get("title", "")
+                signals["author"] = yo.get("author", "")
+
+            r = await client.get(url, headers=headers)
+            html = r.text or ""
+
+            signals["title"] = signals["title"] or _meta(html, "og:title", "twitter:title")
+            desc = _meta(html, "og:description", "twitter:description", "description")
+            signals["description"] = desc
+            signals["author"] = signals["author"] or _meta(
+                html, "og:site_name", "author", "twitter:creator", "article:author"
+            )
+            # page <title> fallback
+            if not signals["title"]:
+                mt = re.search(r"<title[^>]*>([^<]{2,200})</title>", html, re.IGNORECASE)
+                if mt:
+                    signals["title"] = _unescape(mt.group(1).strip())
+
+            # crude visible-text strip for extra context
+            txt = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+            txt = re.sub(r"<style[^>]*>.*?</style>", " ", txt, flags=re.DOTALL | re.IGNORECASE)
+            txt = re.sub(r"<[^>]+>", " ", txt)
+            txt = _unescape(re.sub(r"\s+", " ", txt).strip())
+            signals["text"] = txt[:3000]
+
+            signals["hashtags"] = _extract_hashtags(signals["title"], desc, txt[:1500])
+    except Exception:
+        pass
+    return signals
+
+
+async def _fetch_url_content(url: str) -> str:
+    """Legacy helper retained for compatibility: returns concatenated signal text."""
+    s = await fetch_url_signals(url)
+    return _signals_to_prompt(s)
+
+
+def _signals_to_prompt(s: Dict) -> str:
+    parts = [f"SOURCE URL: {s.get('url','')}", f"PLATFORM: {s.get('platform','')}"]
+    if s.get("title"):
+        parts.append(f"TITLE: {s['title']}")
+    if s.get("author"):
+        parts.append(f"AUTHOR/CHANNEL: {s['author']}")
+    if s.get("description"):
+        parts.append(f"DESCRIPTION/CAPTION: {s['description']}")
+    if s.get("hashtags"):
+        parts.append("HASHTAGS: " + ", ".join("#" + h for h in s["hashtags"]))
+    if s.get("text"):
+        parts.append(f"RAW PAGE TEXT (may be noisy): {s['text'][:2000]}")
+    return "\n".join(parts)
 
 
 def detect_source_platform(url: str) -> str:
@@ -116,11 +225,22 @@ async def analyze_text(text: str, source_url: Optional[str] = None) -> Dict:
 
 
 async def analyze_url(url: str) -> Dict:
-    """Fetch a URL and run analysis on its content."""
-    raw = await _fetch_url_content(url)
-    if not raw:
-        raw = f"[Could not fetch page content] URL: {url}"
-    return await analyze_text(raw, source_url=url)
+    """Fetch structured signals from a URL and run analysis on them."""
+    signals = await fetch_url_signals(url)
+    prompt_body = _signals_to_prompt(signals)
+    has_signal = bool(signals.get("title") or signals.get("description") or signals.get("hashtags"))
+    if not has_signal and not signals.get("text"):
+        prompt_body += "\n\n[NOTE] Very little could be extracted from this URL. Only return a detection if the URL slug itself clearly names a title; otherwise return empty detections."
+    result = await analyze_text(prompt_body, source_url=url)
+    # attach signals so caller can persist caption/hashtags
+    result["_signals"] = {
+        "title": signals.get("title", ""),
+        "author": signals.get("author", ""),
+        "hashtags": signals.get("hashtags", []),
+    }
+    if not result.get("caption") and signals.get("description"):
+        result["caption"] = signals["description"][:200]
+    return result
 
 
 async def analyze_image(image_bytes: bytes, mime_type: str = "image/jpeg") -> Dict:
@@ -150,11 +270,27 @@ def _normalize(parsed: Dict, fallback_text: str = "") -> Dict:
         if key in seen:
             continue
         seen.add(key)
+        conf = float(d.get("confidence") or 0.5)
+        # normalize alternatives
+        alts_raw = d.get("alternatives") or []
+        alts = []
+        alt_seen = {key}
+        for a in alts_raw:
+            at = (a.get("title") or "").strip()
+            if not at or at.lower() in alt_seen:
+                continue
+            alt_seen.add(at.lower())
+            alts.append({
+                "title": at,
+                "media_type": a.get("media_type") if a.get("media_type") in ("movie", "tv") else "movie",
+                "confidence": float(a.get("confidence") or 0.4),
+            })
         clean.append({
             "title": title,
             "media_type": d.get("media_type") if d.get("media_type") in ("movie", "tv") else "movie",
-            "confidence": float(d.get("confidence") or 0.5),
+            "confidence": conf,
             "reason": (d.get("reason") or "")[:300],
+            "alternatives": alts[:2],
         })
     return {
         "caption": (parsed.get("caption") or "")[:200],

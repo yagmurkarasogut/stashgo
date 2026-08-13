@@ -29,6 +29,7 @@ export default function AddDiscovery() {
   const [result, setResult] = useState<Discovery | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Record<number, number>>({});
 
   const pickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -69,18 +70,17 @@ export default function AddDiscovery() {
     }
   };
 
-  const saveDetection = async (det: Detection) => {
-    if (!det.tmdb_id) return;
-    const key = `${det.tmdb_id}-${det.media_type}`;
-    setSaving(key);
+  const saveDetection = async (cand: { tmdb_id?: number; media_type: 'movie' | 'tv'; title: string }, groupKey: string) => {
+    if (!cand.tmdb_id) return;
+    setSaving(groupKey);
     try {
       await api.post('/library', {
-        tmdb_id: det.tmdb_id,
-        media_type: det.media_type,
-        title: det.title,
+        tmdb_id: cand.tmdb_id,
+        media_type: cand.media_type,
+        title: cand.title,
         discovery_id: result?.discovery_id,
       });
-      setSaved(new Set([...saved, key]));
+      setSaved(new Set([...saved, groupKey]));
     } catch (e) {
       console.warn('save failed', e);
     } finally {
@@ -182,21 +182,53 @@ export default function AddDiscovery() {
                 Detected {result.detections.length > 0 ? `(${result.detections.length})` : ''}
               </Text>
               {result.detections.length === 0 ? (
-                <Text style={styles.noneDetected}>No movies or TV shows detected in this content.</Text>
+                <Text style={styles.noneDetected}>No movies or TV shows detected — Loom won't guess when it isn't sure.</Text>
               ) : (
                 result.detections.map((d, i) => {
-                  const key = `${d.tmdb_id}-${d.media_type}`;
+                  const candidates = [
+                    { title: d.title, media_type: d.media_type, tmdb_id: d.tmdb_id, poster_url: d.poster_url, year: d.year, confidence: d.confidence },
+                    ...(d.alternatives || []),
+                  ];
+                  const sel = picked[i] ?? 0;
+                  const chosen = candidates[sel] || candidates[0];
+                  const key = `${chosen.tmdb_id}-${chosen.media_type}`;
                   const isSaved = saved.has(key);
+                  const lowConf = d.confidence < 0.75;
+                  const showPicker = candidates.length > 1;
                   return (
                     <View key={i} style={styles.detRow} testID={`detection-${i}`}>
-                      <Image source={{ uri: d.poster_url || IMAGES.posterFallback }} style={styles.detPoster} contentFit="cover" />
+                      <Image source={{ uri: chosen.poster_url || IMAGES.posterFallback }} style={styles.detPoster} contentFit="cover" />
                       <View style={{ flex: 1, padding: spacing.md }}>
-                        <Text style={styles.detTitle}>{d.title}</Text>
-                        <Text style={styles.detMeta}>{d.media_type.toUpperCase()} {d.year ? `· ${d.year}` : ''} · {(d.confidence * 100).toFixed(0)}%</Text>
+                        <Text style={styles.detTitle}>{chosen.title}</Text>
+                        <Text style={styles.detMeta}>{chosen.media_type.toUpperCase()} {chosen.year ? `· ${chosen.year}` : ''} · {(chosen.confidence * 100).toFixed(0)}% match</Text>
+                        {lowConf ? (
+                          <View style={styles.lowConfBadge}>
+                            <Ionicons name="help-circle-outline" size={12} color={colors.warning} />
+                            <Text style={styles.lowConfText}>Not fully sure — pick the right one</Text>
+                          </View>
+                        ) : null}
                         {d.reason ? <Text style={styles.detReason} numberOfLines={2}>{d.reason}</Text> : null}
+
+                        {showPicker ? (
+                          <View style={styles.candRow}>
+                            {candidates.map((c, ci) => (
+                              <Pressable
+                                key={ci}
+                                testID={`detection-${i}-candidate-${ci}`}
+                                onPress={() => setPicked({ ...picked, [i]: ci })}
+                                style={[styles.candChip, ci === sel && styles.candChipActive]}
+                              >
+                                <Text style={[styles.candChipText, ci === sel && { color: colors.brand }]} numberOfLines={1}>
+                                  {c.title}{c.year ? ` (${c.year})` : ''}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        ) : null}
+
                         <Pressable
                           testID={`detection-save-${i}`}
-                          onPress={() => saveDetection(d)}
+                          onPress={() => saveDetection(chosen, key)}
                           disabled={isSaved || saving === key}
                           style={[styles.saveBtn, isSaved && { backgroundColor: colors.success }]}
                         >
@@ -244,6 +276,12 @@ const styles = StyleSheet.create({
   detTitle: { color: colors.onSurface, fontSize: 15, fontWeight: '700' },
   detMeta: { color: colors.onSurfaceTertiary, fontSize: 11, marginTop: 2 },
   detReason: { color: colors.onSurfaceSecondary, fontSize: 12, marginTop: spacing.sm },
+  lowConfBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
+  lowConfText: { color: colors.warning, fontSize: 11, fontWeight: '600' },
+  candRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  candChip: { paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: radius.sm, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border, maxWidth: '100%' },
+  candChipActive: { borderColor: colors.brand, backgroundColor: colors.brandTertiary },
+  candChipText: { color: colors.onSurfaceSecondary, fontSize: 11, fontWeight: '600' },
   saveBtn: { marginTop: spacing.sm, backgroundColor: colors.brand, paddingVertical: 8, borderRadius: radius.sm, alignItems: 'center' },
   saveBtnText: { color: colors.onBrand, fontWeight: '700', fontSize: 12 },
 });

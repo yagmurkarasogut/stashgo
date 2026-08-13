@@ -83,6 +83,15 @@ class DiscoveryCreate(BaseModel):
     image_mime: Optional[str] = "image/jpeg"
 
 
+class AltCandidate(BaseModel):
+    title: str
+    media_type: Literal["movie", "tv"]
+    confidence: float
+    tmdb_id: Optional[int] = None
+    poster_url: Optional[str] = None
+    year: Optional[int] = None
+
+
 class Detection(BaseModel):
     title: str
     media_type: Literal["movie", "tv"]
@@ -91,6 +100,7 @@ class Detection(BaseModel):
     tmdb_id: Optional[int] = None
     poster_url: Optional[str] = None
     year: Optional[int] = None
+    alternatives: List[AltCandidate] = []
 
 
 class Discovery(BaseModel):
@@ -119,6 +129,8 @@ class LibraryEntry(BaseModel):
     genres: List[str] = []
     poster_url: Optional[str] = None
     backdrop_url: Optional[str] = None
+    runtime: Optional[int] = None
+    tmdb_rating: Optional[float] = None
     watch_status: Literal["want_to_watch", "watching", "watched"] = "want_to_watch"
     user_rating: Optional[float] = None
     user_note: str = ""
@@ -139,6 +151,8 @@ class Collection(BaseModel):
     name: str
     description: str = ""
     entry_ids: List[str] = []
+    item_count: int = 0
+    cover_posters: List[str] = []
     created_at: datetime
 
 
@@ -292,16 +306,33 @@ async def _enrich_detections(raw: List[Dict]) -> List[Dict]:
     enriched = []
     for d in raw:
         info = await tmdb_svc.search_and_enrich(d["title"], d.get("media_type"))
-        if info:
-            enriched.append({
-                "title": info["title"],
-                "media_type": info["media_type"],
-                "confidence": d.get("confidence", 0.5),
-                "reason": d.get("reason", ""),
-                "tmdb_id": info["tmdb_id"],
-                "poster_url": info.get("poster_url"),
-                "year": info.get("year"),
-            })
+        if not info:
+            continue
+        # enrich alternatives lightly so the user can pick the right one
+        alt_out = []
+        for a in d.get("alternatives", [])[:2]:
+            ainfo = await tmdb_svc.search_and_enrich(a["title"], a.get("media_type"))
+            if ainfo:
+                alt_out.append({
+                    "title": ainfo["title"],
+                    "media_type": ainfo["media_type"],
+                    "confidence": a.get("confidence", 0.4),
+                    "tmdb_id": ainfo["tmdb_id"],
+                    "poster_url": ainfo.get("poster_url"),
+                    "year": ainfo.get("year"),
+                })
+        enriched.append({
+            "title": info["title"],
+            "media_type": info["media_type"],
+            "confidence": d.get("confidence", 0.5),
+            "reason": d.get("reason", ""),
+            "tmdb_id": info["tmdb_id"],
+            "poster_url": info.get("poster_url"),
+            "year": info.get("year"),
+            "alternatives": alt_out,
+        })
+    # order by confidence (best first)
+    enriched.sort(key=lambda x: x.get("confidence", 0), reverse=True)
     return enriched
 
 
@@ -403,6 +434,8 @@ async def save_to_library(body: LibrarySaveBody, user=Depends(get_current_user))
         "genres": info.get("genres", []),
         "poster_url": info.get("poster_url"),
         "backdrop_url": info.get("backdrop_url"),
+        "runtime": info.get("runtime"),
+        "tmdb_rating": info.get("tmdb_rating"),
         "watch_status": "want_to_watch",
         "user_rating": None,
         "user_note": "",
@@ -420,14 +453,39 @@ async def list_library(
     user=Depends(get_current_user),
     media_type: Optional[str] = None,
     watch_status: Optional[str] = None,
+    genre: Optional[str] = None,
+    sort: Optional[str] = "recent",
 ):
     q = {"user_id": user["user_id"]}
     if media_type in ("movie", "tv"):
         q["media_type"] = media_type
     if watch_status:
         q["watch_status"] = watch_status
-    cursor = db.library.find(q, {"_id": 0}).sort("created_at", -1).limit(500)
-    return await cursor.to_list(length=500)
+    if genre:
+        # case-insensitive genre match within the genres array
+        q["genres"] = {"$elemMatch": {"$regex": f"^{re.escape(genre)}$", "$options": "i"}}
+
+    sort_map = {
+        "recent": [("created_at", -1)],
+        "release": [("year", -1)],
+        "rating": [("tmdb_rating", -1)],
+        "alpha": [("title", 1)],
+    }
+    sort_spec = sort_map.get(sort or "recent", sort_map["recent"])
+    cursor = db.library.find(q, {"_id": 0}).sort(sort_spec).limit(500)
+    items = await cursor.to_list(length=500)
+    # push null sort-values to the end for release/rating
+    if sort in ("release", "rating"):
+        key = "year" if sort == "release" else "tmdb_rating"
+        items.sort(key=lambda x: (x.get(key) is None, -(x.get(key) or 0)))
+    return items
+
+
+@api.get("/library/genres/list")
+async def library_genres(user=Depends(get_current_user)):
+    """Distinct genres present in the user's library."""
+    genres = await db.library.distinct("genres", {"user_id": user["user_id"]})
+    return {"genres": sorted([g for g in genres if g])}
 
 
 @api.get("/library/{entry_id}", response_model=LibraryEntry)
@@ -484,8 +542,55 @@ async def create_collection(body: CollectionCreate, user=Depends(get_current_use
 
 @api.get("/collections", response_model=List[Collection])
 async def list_collections(user=Depends(get_current_user)):
-    cur = db.collections.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1)
-    return await cur.to_list(length=100)
+    cols = await db.collections.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(length=100)
+    for c in cols:
+        ids = c.get("entry_ids", [])
+        c["item_count"] = len(ids)
+        if ids:
+            posters = await db.library.find(
+                {"user_id": user["user_id"], "entry_id": {"$in": ids[:4]}},
+                {"_id": 0, "poster_url": 1},
+            ).to_list(length=4)
+            c["cover_posters"] = [p["poster_url"] for p in posters if p.get("poster_url")]
+        else:
+            c["cover_posters"] = []
+    return cols
+
+
+@api.get("/collections/{collection_id}")
+async def get_collection(collection_id: str, user=Depends(get_current_user)):
+    c = await db.collections.find_one({"collection_id": collection_id, "user_id": user["user_id"]}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="List not found")
+    ids = c.get("entry_ids", [])
+    entries = []
+    if ids:
+        docs = await db.library.find(
+            {"user_id": user["user_id"], "entry_id": {"$in": ids}}, {"_id": 0}
+        ).to_list(length=500)
+        # preserve list order
+        order = {eid: i for i, eid in enumerate(ids)}
+        entries = sorted(docs, key=lambda d: order.get(d["entry_id"], 9999))
+    c["entries"] = entries
+    c["item_count"] = len(entries)
+    return c
+
+
+@api.get("/library/{entry_id}/lists")
+async def lists_for_entry(entry_id: str, user=Depends(get_current_user)):
+    """Return all custom lists, flagging which contain this entry."""
+    cols = await db.collections.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(length=100)
+    return {
+        "lists": [
+            {
+                "collection_id": c["collection_id"],
+                "name": c["name"],
+                "contains": entry_id in c.get("entry_ids", []),
+                "item_count": len(c.get("entry_ids", [])),
+            }
+            for c in cols
+        ]
+    }
 
 
 class CollectionItemBody(BaseModel):

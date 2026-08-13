@@ -62,6 +62,15 @@ export type User = {
   created_at: string;
 };
 
+export type AltCandidate = {
+  title: string;
+  media_type: 'movie' | 'tv';
+  confidence: number;
+  tmdb_id?: number;
+  poster_url?: string;
+  year?: number;
+};
+
 export type Detection = {
   title: string;
   media_type: 'movie' | 'tv';
@@ -70,6 +79,7 @@ export type Detection = {
   tmdb_id?: number;
   poster_url?: string;
   year?: number;
+  alternatives?: AltCandidate[];
 };
 
 export type Discovery = {
@@ -98,10 +108,23 @@ export type LibraryEntry = {
   genres: string[];
   poster_url?: string;
   backdrop_url?: string;
+  runtime?: number;
+  tmdb_rating?: number;
   watch_status: 'want_to_watch' | 'watching' | 'watched';
   user_rating?: number;
   user_note: string;
   discovery_id?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type CustomList = {
+  collection_id: string;
+  name: string;
+  description?: string;
+  entry_ids?: string[];
+  item_count: number;
+  cover_posters: string[];
+  created_at?: string;
+  entries?: LibraryEntry[];
 };

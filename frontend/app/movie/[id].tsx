@@ -22,6 +22,16 @@ export default function MovieDetail() {
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState('');
   const [rating, setRating] = useState<string>('');
+  const [lists, setLists] = useState<{ collection_id: string; name: string; contains: boolean; item_count: number }[]>([]);
+  const [newListName, setNewListName] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
+
+  const loadLists = useCallback(async () => {
+    try {
+      const res = await api.get<{ lists: typeof lists }>(`/library/${id}/lists`);
+      setLists(res.lists);
+    } catch (e) { console.warn('lists load failed', e); }
+  }, [id]);
 
   const load = useCallback(async () => {
     try {
@@ -32,7 +42,28 @@ export default function MovieDetail() {
     } finally { setLoading(false); }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadLists(); }, [load, loadLists]);
+
+  const toggleList = async (listId: string, contains: boolean) => {
+    setLists((prev) => prev.map((l) => l.collection_id === listId ? { ...l, contains: !contains } : l));
+    try {
+      if (contains) await api.del(`/collections/${listId}/items/${id}`);
+      else await api.post(`/collections/${listId}/items`, { entry_id: id });
+    } catch (e) { console.warn(e); loadLists(); }
+  };
+
+  const createList = async () => {
+    const name = newListName.trim();
+    if (!name) return;
+    setCreatingList(true);
+    try {
+      const c = await api.post<{ collection_id: string }>('/collections', { name });
+      await api.post(`/collections/${c.collection_id}/items`, { entry_id: id });
+      setNewListName('');
+      await loadLists();
+    } catch (e) { console.warn(e); }
+    finally { setCreatingList(false); }
+  };
 
   const update = async (patch: any) => {
     try {
@@ -75,6 +106,20 @@ export default function MovieDetail() {
             <Text style={styles.mediaBadge}>{entry.media_type.toUpperCase()} {entry.year ? `· ${entry.year}` : ''}</Text>
             <Text style={styles.heroTitle}>{entry.title}</Text>
             {entry.director ? <Text style={styles.heroDir}>Directed by {entry.director}</Text> : null}
+            <View style={styles.metaChips}>
+              {entry.tmdb_rating != null ? (
+                <View style={styles.metaChip}>
+                  <Ionicons name="star" size={12} color={colors.brand} />
+                  <Text style={styles.metaChipText}>{entry.tmdb_rating.toFixed(1)}</Text>
+                </View>
+              ) : null}
+              {entry.runtime ? (
+                <View style={styles.metaChip}>
+                  <Ionicons name="time-outline" size={12} color={colors.onSurfaceSecondary} />
+                  <Text style={styles.metaChipText}>{entry.runtime}m</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -157,6 +202,41 @@ export default function MovieDetail() {
             </Pressable>
           </View>
 
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Add to lists</Text>
+            {lists.length === 0 ? (
+              <Text style={styles.listsEmpty}>No lists yet. Create one below.</Text>
+            ) : (
+              <View style={styles.listsWrap}>
+                {lists.map((l) => (
+                  <Pressable
+                    key={l.collection_id}
+                    testID={`detail-list-${l.collection_id}`}
+                    onPress={() => toggleList(l.collection_id, l.contains)}
+                    style={[styles.listChip, l.contains && styles.listChipActive]}
+                  >
+                    <Ionicons name={l.contains ? 'checkmark-circle' : 'add-circle-outline'} size={14} color={l.contains ? colors.brand : colors.onSurfaceTertiary} />
+                    <Text style={[styles.listChipText, l.contains && { color: colors.brand }]}>{l.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <View style={styles.newListRow}>
+              <TextInput
+                testID="detail-new-list-input"
+                value={newListName}
+                onChangeText={setNewListName}
+                placeholder="New list name…"
+                placeholderTextColor={colors.onSurfaceTertiary}
+                style={styles.newListInput}
+                onSubmitEditing={createList}
+              />
+              <Pressable testID="detail-create-list" onPress={createList} disabled={creatingList} style={styles.saveBtn}>
+                {creatingList ? <ActivityIndicator size="small" color={colors.onBrand} /> : <Text style={styles.saveBtnText}>Create</Text>}
+              </Pressable>
+            </View>
+          </View>
+
           <Pressable testID="detail-remove" onPress={remove} style={styles.remove}>
             <Ionicons name="trash-outline" size={16} color={colors.error} />
             <Text style={styles.removeText}>Remove from library</Text>
@@ -177,6 +257,16 @@ const styles = StyleSheet.create({
   mediaBadge: { color: colors.brand, fontSize: 11, letterSpacing: 2, fontWeight: '700' },
   heroTitle: { color: colors.onSurface, fontSize: 32, fontWeight: '800', marginTop: spacing.xs, lineHeight: 36 },
   heroDir: { color: colors.onSurfaceSecondary, fontSize: 13, marginTop: spacing.xs },
+  metaChips: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(31,35,42,0.8)', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  metaChipText: { color: colors.onSurface, fontSize: 12, fontWeight: '700' },
+  listsEmpty: { color: colors.onSurfaceTertiary, fontSize: 12, fontStyle: 'italic', marginBottom: spacing.sm },
+  listsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  listChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border },
+  listChipActive: { borderColor: colors.brand, backgroundColor: colors.brandTertiary },
+  listChipText: { color: colors.onSurfaceSecondary, fontSize: 12, fontWeight: '600' },
+  newListRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  newListInput: { flex: 1, backgroundColor: colors.surfaceTertiary, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 10, color: colors.onSurface, fontSize: 13 },
   body: { padding: spacing.lg, gap: spacing.md },
   card: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   cardLabel: { color: colors.onSurfaceTertiary, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing.sm },

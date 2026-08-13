@@ -2,17 +2,31 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ScrollView, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
-const FILTERS: { key: string; label: string }[] = [
+const TYPE_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'movie', label: 'Movies' },
   { key: 'tv', label: 'TV' },
-  { key: 'want_to_watch', label: 'Want to watch' },
+];
+
+const STATUS_FILTERS = [
+  { key: 'all', label: 'Any status' },
+  { key: 'want_to_watch', label: 'Want to Watch' },
   { key: 'watching', label: 'Watching' },
   { key: 'watched', label: 'Watched' },
+];
+
+const GENRES = ['All', 'Drama', 'Sci-Fi', 'Horror', 'Thriller', 'Comedy', 'Romance', 'Documentary', 'Animation'];
+
+const SORTS = [
+  { key: 'recent', label: 'Recently Added' },
+  { key: 'release', label: 'Release Date' },
+  { key: 'rating', label: 'Rating' },
+  { key: 'alpha', label: 'Alphabetical' },
 ];
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -24,44 +38,86 @@ export default function Library() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<LibraryEntry[]>([]);
-  const [filter, setFilter] = useState('all');
+  const [typeF, setTypeF] = useState('all');
+  const [statusF, setStatusF] = useState('all');
+  const [genreF, setGenreF] = useState('All');
+  const [sort, setSort] = useState('recent');
+  const [sortOpen, setSortOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      let q = '';
-      if (filter === 'movie' || filter === 'tv') q = `?media_type=${filter}`;
-      else if (filter === 'want_to_watch' || filter === 'watching' || filter === 'watched') q = `?watch_status=${filter}`;
-      const data = await api.get<LibraryEntry[]>('/library' + q);
+      const params = new URLSearchParams();
+      if (typeF !== 'all') params.append('media_type', typeF);
+      if (statusF !== 'all') params.append('watch_status', statusF);
+      if (genreF !== 'All') params.append('genre', genreF === 'Sci-Fi' ? 'Sci-Fi' : genreF);
+      params.append('sort', sort);
+      const data = await api.get<LibraryEntry[]>('/library?' + params.toString());
       setItems(data);
     } catch (e) {
       console.warn('library load failed', e);
     } finally {
       setRefreshing(false);
     }
-  }, [filter]);
+  }, [typeF, statusF, genreF, sort]);
 
   useEffect(() => { load(); }, [load]);
+
+  const sortLabel = SORTS.find((s) => s.key === sort)?.label || 'Sort';
 
   return (
     <View style={styles.root} testID="library-screen">
       <View style={[styles.stickyHeader, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.title}>Library</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-        >
-          {FILTERS.map((f) => {
-            const active = f.key === filter;
-            return (
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Library</Text>
+          <Pressable testID="library-sort-button" onPress={() => setSortOpen((v) => !v)} style={styles.sortBtn}>
+            <Ionicons name="swap-vertical" size={14} color={colors.brand} />
+            <Text style={styles.sortText}>{sortLabel}</Text>
+          </Pressable>
+        </View>
+
+        {sortOpen ? (
+          <View style={styles.sortMenu}>
+            {SORTS.map((s) => (
               <Pressable
-                key={f.key}
-                testID={`library-chip-${f.key}`}
-                onPress={() => setFilter(f.key)}
-                style={[styles.chip, active && styles.chipActive]}
+                key={s.key}
+                testID={`library-sort-${s.key}`}
+                onPress={() => { setSort(s.key); setSortOpen(false); }}
+                style={[styles.sortItem, s.key === sort && styles.sortItemActive]}
               >
+                <Text style={[styles.sortItemText, s.key === sort && { color: colors.brand }]}>{s.label}</Text>
+                {s.key === sort ? <Ionicons name="checkmark" size={14} color={colors.brand} /> : null}
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {TYPE_FILTERS.map((f) => {
+            const active = f.key === typeF;
+            return (
+              <Pressable key={f.key} testID={`library-type-${f.key}`} onPress={() => setTypeF(f.key)} style={[styles.chip, active && styles.chipActive]}>
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+          <View style={styles.chipDivider} />
+          {STATUS_FILTERS.filter((s) => s.key !== 'all').map((f) => {
+            const active = f.key === statusF;
+            return (
+              <Pressable key={f.key} testID={`library-status-${f.key}`} onPress={() => setStatusF(active ? 'all' : f.key)} style={[styles.chip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { marginTop: spacing.sm }]}>
+          {GENRES.map((g) => {
+            const active = g === genreF;
+            return (
+              <Pressable key={g} testID={`library-genre-${g}`} onPress={() => setGenreF(g)} style={[styles.genreChip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{g}</Text>
               </Pressable>
             );
           })}
@@ -107,8 +163,17 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   stickyHeader: { paddingHorizontal: 0, paddingBottom: spacing.md, borderBottomColor: colors.border, borderBottomWidth: 0.5, backgroundColor: colors.surface },
   title: { color: colors.onSurface, fontSize: 28, fontWeight: '700', paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: spacing.lg },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 7, marginBottom: spacing.md },
+  sortText: { color: colors.brand, fontSize: 12, fontWeight: '600' },
+  sortMenu: { marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  sortItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: 11, borderBottomColor: colors.divider, borderBottomWidth: 0.5 },
+  sortItemActive: { backgroundColor: colors.brandTertiary },
+  sortItemText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: '600' },
   chipRow: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   chip: { height: 36, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  genreChip: { height: 34, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  chipDivider: { width: 1, height: 24, backgroundColor: colors.border, alignSelf: 'center', marginHorizontal: spacing.xs },
   chipActive: { borderColor: colors.brand, backgroundColor: colors.brandTertiary },
   chipText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: '600' },
   chipTextActive: { color: colors.brand },

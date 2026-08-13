@@ -41,6 +41,7 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="add-discovery" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="movie/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="list/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

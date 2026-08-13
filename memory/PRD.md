@@ -42,6 +42,13 @@ Build the complete backend architecture and product foundation for **Loom**, an 
 - Cinematic dark "Glass/Luxe" mobile UI: Auth, Home feed, Add-discovery modal, Library grid, Search, Movie detail, Profile — 2026-06
 - 23/23 backend pytest passing; all frontend flows verified — 2026-06
 
+### Iteration 2 — Accuracy, Metadata & Organization (2026-06)
+- **P1 Discovery accuracy:** richer URL signal extraction (og/twitter meta, page title, hashtags, YouTube oEmbed, author); conservative anti-hallucination prompt; per-detection `alternatives` (top-3 candidates surfaced when confidence < 0.75, each TMDB-enriched); detections ordered by confidence.
+- **P2 TMDB enrichment:** added `runtime`, `tmdb_rating`, richer cast (up to 8), backdrop; shown as chips on Movie detail.
+- **P3 Library:** independent type (All/Movies/TV) + status (Want/Watching/Watched) + genre (8 fixed genres) filters and sorting (Recently Added / Release Date / Rating / Alphabetical); `GET /library/genres/list`.
+- **P4 Custom Lists:** `Lists` tab + list detail; a title can belong to multiple lists; add/remove from lists inline on Movie detail; list cards show cover stack + count.
+- 15/15 new backend pytest passing; all frontend flows verified — 2026-06
+
 ## Backlog / Remaining
 - **P1:** Custom lists (separate from collections), Apple Sign-In, native iOS Share Extension + Android Share Intent workflow (requires native build)
 - **P1:** Real TMDB key wiring (user to provide) — infra already in place

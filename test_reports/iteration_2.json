@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 2 testing of Loom (P1 URL/text discovery accuracy, P2 TMDB enrichment runtime/rating/backdrop, P3 library filter+sort+genres, P4 Custom Lists with multi-list membership). Backend: 15/15 new pytest tests passing (test_iteration_2.py) — clear titles give ≥0.75 confidence, ambiguous inputs yield ≤2 alternatives each with tmdb_id+poster+year, noise input never hallucinates high-confidence, url-kind never 500s. Library entries return runtime, tmdb_rating, backdrop_url. All filters (media_type/watch_status/genre) and sorts (recent/release/rating/alpha) verified. /library/genres/list distinct+sorted. Multi-list membership verified — same entry in two lists, /library/{id}/lists returns correct contains flags, list_collections returns cover_posters+item_count, remove-from-one-list preserves membership in other. Frontend (390x844 mobile viewport): register→home OK; Library screen sort menu (4 options: recent/release/rating/alpha), type chips (all/movies/tv), status chips (want/watching/watched) all render+tappable; Add-Discovery text mode with ambiguous input returned detection-0 with 2 candidate chips (detection-0-candidate-0, -1), selecting alternate chip and saving worked; Lists tab create list → card shown → detail screen OK → back; Movie detail screen shows TMDB rating chip (7.3) + runtime chip (127m), Add-to-lists section shows existing toggles and inline create-list adds a new toggle (count went 1→2). No React Native red screen, no deprecated Expo packages (expo-av/barcode-scanner/background-fetch not present). Only cosmetic RN-Web warnings (shadow*, pointerEvents) as noted in iteration_1.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_2.py",
+    "/app/test_reports/pytest/pytest_iter2.xml"
+  ],
+  "action_items": [
+    "(Optional) Add testID props to the bottom Tabs.Screen items in /app/frontend/app/(tabs)/_layout.tsx (e.g. tab-home, tab-library, tab-lists) so future tests can navigate via tap bar rather than deep-linking via router.",
+    "(Optional cleanup, carried over from iteration 1) Migrate shadow* → boxShadow and props.pointerEvents → style.pointerEvents to silence RN-Web deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~700 lines — still acceptable but at the split threshold; recommend routers for auth / discoveries / library / collections / search when adding the next feature batch.",
+    "Route ordering: GET /library/{entry_id}/lists is defined AFTER GET /library/{entry_id} — FastAPI resolves in declaration order, and both share the /library/{X}[/lists] pattern. FastAPI's path parser handles this fine because '/lists' is a static suffix, and tests pass. Still, consider grouping the more-specific /lists route ABOVE /{entry_id} for clarity.",
+    "_enrich_detections sorts by confidence but preserves the original detection order via stable sort — good. Alternatives are correctly limited to top-2 in the enrichment layer even if the model returns more.",
+    "TMDB mock fallback in tmdb.search_and_enrich fabricates a stub for unknown titles (stub_id + placeholder overview). That is fine for mock mode but means a hallucinated title from the AI will still get a poster + fake tmdb_id at the API layer. The NEVER-HALLUCINATE rule is therefore enforced entirely by the AI prompt + confidence gating (which our test_text_no_hallucination_on_noise confirms works). Worth documenting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_2.py (new — 15 tests for P1-P4)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 iteration-2 tests, plus 23/23 iteration-1 regression previously)",
+    "frontend": "100% of tested flows (register, library filters+sort, add-discovery with alternatives chip selection, list create/open/back, movie detail runtime+rating+add-to-lists inline create)"
+  },
+  "seed_data_creation": "Test-only users created per-run with @gmail.com (iter2_*). Seeded a mixed library (Parasite, Hereditary, La La Land, Spirited Away, Planet Earth II, Breaking Bad) inside the P3 test class fixture. All TEST_-prefixed collections deleted at end of P4 flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with -o 'addopts=' to bypass -n xdist (module-scoped fixtures share state). Backend URL from EXPO_PUBLIC_BACKEND_URL env, prefix /api. TMDB is MOCKED (TMDB_API_KEY empty) — MOCK_CATALOG in services/tmdb.py contains The Invitation, The Substance, Parasite, Hereditary, La La Land, Spirited Away, Planet Earth II plus originals; use those for genre/sort tests. AI text discovery takes 5-12s (Gemini 3 Flash). Frontend tab navigation lacks testIDs on Tabs.Screen — deep-link via router URLs like /(tabs)/library, /(tabs)/lists, /add-discovery. All interactive elements inside screens DO have testIDs. Alternatives chips only render when model confidence < 0.75 — tested with ambiguous prompt 'A24 slow-burn horror about family grief and cults'.",
+  "rca_of_issue": "N/A — no bugs found."
+}
