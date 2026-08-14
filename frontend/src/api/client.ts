@@ -1,7 +1,7 @@
-// Minimal API client for Loom
+// Minimal API client for Trace
 import { storage } from '@/src/utils/storage';
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+const BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
 
 let inMemoryToken: string | null = null;
 
@@ -23,6 +23,9 @@ export async function setToken(token: string | null) {
 export type ApiError = { status: number; detail: string };
 
 async function request<T>(path: string, opts: RequestInit = {}, auth = true): Promise<T> {
+  if (!BASE) {
+    throw { status: 0, detail: 'Server URL is not configured (EXPO_PUBLIC_BACKEND_URL missing in build).' } as ApiError;
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(opts.headers as Record<string, string> | undefined),
@@ -31,12 +34,26 @@ async function request<T>(path: string, opts: RequestInit = {}, auth = true): Pr
     const t = await getToken();
     if (t) headers['Authorization'] = `Bearer ${t}`;
   }
-  const res = await fetch(`${BASE}/api${path}`, { ...opts, headers });
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api${path}`, { ...opts, headers });
+  } catch {
+    // Network / DNS / TLS failure — the request never reached the backend
+    throw { status: 0, detail: `Cannot reach server. Check your connection. (${BASE})` } as ApiError;
+  }
+
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) {
-    const detail = (data && data.detail) || res.statusText || 'Request failed';
+    let detail: any = (data && data.detail) || res.statusText || `Request failed (${res.status})`;
+    if (Array.isArray(detail)) {
+      // FastAPI/Pydantic 422 validation errors come as a list
+      detail = detail.map((d: any) => d?.msg || (typeof d === 'string' ? d : JSON.stringify(d))).join('; ');
+    } else if (typeof detail !== 'string') {
+      detail = JSON.stringify(detail);
+    }
     const err: ApiError = { status: res.status, detail: String(detail) };
     throw err;
   }

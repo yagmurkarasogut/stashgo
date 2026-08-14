@@ -68,3 +68,8 @@ Build the complete backend architecture and product foundation for **Loom**, an 
 - Add native Share Extension / Share Intent so users can share directly from Reels/TikTok into Loom.
 - Build Collections UI screens (create, browse, add posters).
 - Add discovery-source detail view.
+
+## Production Notes / Incident Log
+- **Prod login/registration "Registration failed":** Reproduced the exact payload against backend logic in preview → 200 OK (register + login), so backend/DB/validation are correct. Symptom = client fallback shown when the thrown error has no `detail` → the deployed build could not reach the backend (empty/incorrect `EXPO_PUBLIC_BACKEND_URL` baked at Metro build time). Preview and production use SEPARATE DBs (preview-only accounts 401 in prod by design).
+  - Client hardening shipped in `src/api/client.ts`: explicit `ApiError` on network/fetch failure (includes target URL), explicit error when `EXPO_PUBLIC_BACKEND_URL` is empty, readable handling of array (422) `detail`. Verified by testing_agent (iteration_5) — no regression; wrong password now shows "Invalid credentials".
+  - Action: dispatched deployer to verify the LITERAL baked backend URL and re-bake `EXPO_PUBLIC_BACKEND_URL=https://media-vault-api.emergent.host` if wrong. User must **redeploy** to re-bundle, then use a **production-registered** account.

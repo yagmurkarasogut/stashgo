@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 5 — targeted regression for hardened /app/frontend/src/api/client.ts (clear ApiError on network/fetch failure + explicit 'Server URL is not configured' when EXPO_PUBLIC_BACKEND_URL is empty). Frontend-only test on 390×844 mobile viewport against EXPO_PUBLIC_BACKEND_URL=https://media-vault-api.preview.emergentagent.com. ALL 5 REQUESTED FLOWS PASS: (1) Signup — registered iter5_1786719288@gmail.com via register-email-input/register-password-input/register-submit-button → landed on home-screen with no errors. (2) Logout via profile-logout-button → returned to login-screen; then login-email-input/login-password-input/login-submit-button with same creds → home-screen. (3) Wrong-password negative case — login-error text renders MEANINGFUL backend detail 'Invalid credentials' (NOT blank, NOT generic 'Login failed'), confirming request() correctly propagates data.detail into ApiError.detail and login.tsx surfaces e?.detail. (4) Onboarding still reachable — login-goto-register from login → onboarding-screen loads with zero pageerrors, then onboarding-skip → register-screen. (5) Regression — home-screen loads, tab-library renders library-screen, FAB opens add-discovery-screen, add-mode-text + add-text-input 'Interstellar (2014)' + add-submit-button → app-toast 'Saved to library: Interstellar' + add-saved-banner 'Auto-saved 1 title(s) to your library' + detection card shows '✓ In your library' (auth-protected /api/discoveries call succeeded through hardened client with Bearer token). Zero pageerrors, zero red-screen. The only 401 in console is the expected 'Missing bearer token' on the initial /home request BEFORE login, which is correct behaviour. The client-side hardening is regression-free in preview.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "Deprecated `ImagePicker.MediaTypeOptions.Images` still used. Reference: /app/frontend/app/add-discovery.tsx:41. Not blocking; carry-over from iter3/iter4."},
+      {"component": "RN-Web (Animated)", "issue": "'Animated: useNativeDriver is not supported...' warning on add-saved-banner animation — web-only, cosmetic."},
+      {"component": "RN-Web", "issue": "'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' warnings — cosmetic on web preview only, carry-over."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_5.json"],
+  "action_items": [
+    "None blocking for this hardening change — main agent can ship /app/frontend/src/api/client.ts as-is.",
+    "(Carry-over) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41 (future-proof for expo-image-picker v16+)."
+  ],
+  "critical_code_review_comments": [
+    "client.ts request(): the try/catch around fetch correctly swallows the underlying error (using bare `catch`) and rethrows a shaped ApiError with the BASE URL for debuggability — good.",
+    "client.ts detail resolution `(data && data.detail) || res.statusText || 'Request failed (status)'` preserves FastAPI validation errors when detail is a string, but if backend returns detail as an array (e.g. Pydantic 422 with list of errors), `String(detail)` will produce '[object Object]'. Consider `typeof detail === 'string' ? detail : JSON.stringify(detail)` for cleaner 422 messages. Non-blocking; login flow uses HTTPException(status_code=401, detail='Invalid credentials') which is a string.",
+    "Empty BASE check (line 26) throws BEFORE headers/token resolution — good; avoids leaking token attempts to a bad URL.",
+    "getToken() memoisation via inMemoryToken means a manual secureRemove outside setToken() would go unnoticed until reload — minor, unchanged behaviour."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "100% (5/5 requested flows)"},
+  "seed_data_creation": "One @gmail.com user created via register: iter5_1786719288@gmail.com / secret123. Library auto-populated with 1 entry (Interstellar via /discoveries auto-save).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "In PREVIEW, EXPO_PUBLIC_BACKEND_URL is valid so the two new client.ts error paths (BASE empty; fetch network throw) CANNOT be exercised via UI here. Wrong-password path DOES exercise the res.ok=false → data.detail branch and returns 'Invalid credentials'. To reproduce the network-failure branch locally, temporarily point EXPO_PUBLIC_BACKEND_URL to https://invalid.local.example and expect 'Cannot reach server. Check your connection. (…)' in login-error / register-error. For the empty-URL branch, unset EXPO_PUBLIC_BACKEND_URL and expect 'Server URL is not configured (EXPO_PUBLIC_BACKEND_URL missing in build).' Auth flow testIDs unchanged from iter4. AI (Gemini 3 Flash) response ~5–15s per discovery.",
+  "rca_of_issue": "N/A — no bug found. Hardened client.ts preserves happy-path behaviour: (a) BASE non-empty skips the config-missing throw, (b) successful fetch skips the network-throw catch, (c) res.ok=true short-circuits before the shaped ApiError, and (d) on res.ok=false the previous detail-extraction contract is retained. Wrong-password verified end-to-end: backend returns 401 with `{detail: 'Invalid credentials'}` → client throws {status:401, detail:'Invalid credentials'} → login.tsx sets err from e.detail → login-error <Text> renders exactly 'Invalid credentials'."
+}
