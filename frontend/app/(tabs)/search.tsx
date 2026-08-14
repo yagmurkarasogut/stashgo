@@ -45,7 +45,7 @@ export default function Search() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
           <Text style={styles.title}>Semantic Search</Text>
-          <Text style={styles.subtitle}>Ask in your own words. Loom understands.</Text>
+          <Text style={styles.subtitle}>Ask in your own words. Trace understands.</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">

@@ -30,7 +30,7 @@ DB_NAME = os.environ["DB_NAME"]
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="Loom API", version="0.1.0")
+app = FastAPI(title="Trace API", version="1.0.0")
 api = APIRouter(prefix="/api")
 
 logger = logging.getLogger("loom")
@@ -763,8 +763,8 @@ async def semantic_search(body: SearchQuery, user=Depends(get_current_user)):
 @api.get("/")
 async def root():
     return {
-        "service": "loom",
-        "version": "0.1.0",
+        "service": "trace",
+        "version": "1.0.0",
         "tmdb_mocked": tmdb_svc.is_mocked(),
     }
 
@@ -795,7 +795,7 @@ async def on_startup():
     await db.discoveries.create_index([("user_id", 1), ("created_at", -1)])
     await db.library.create_index([("user_id", 1), ("tmdb_id", 1), ("media_type", 1)], unique=True)
     await db.collections.create_index([("user_id", 1), ("created_at", -1)])
-    logger.info("Loom API ready. TMDB mocked=%s", tmdb_svc.is_mocked())
+    logger.info("Trace API ready. TMDB mocked=%s", tmdb_svc.is_mocked())
 
 
 @app.on_event("shutdown")

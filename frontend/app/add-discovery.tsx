@@ -220,7 +220,7 @@ export default function AddDiscovery() {
                 Detected {result.detections.length > 0 ? `(${result.detections.length})` : ''}
               </Text>
               {result.detections.length === 0 ? (
-                <Text style={styles.noneDetected}>{`No movies or TV shows detected — Loom won't guess when it isn't sure.`}</Text>
+                <Text style={styles.noneDetected}>{`No movies or TV shows detected — Trace won't guess when it isn't sure.`}</Text>
               ) : (
                 result.detections.map((d, i) => {
                   const candidates = [

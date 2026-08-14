@@ -42,7 +42,7 @@ export default function Login() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.brandMark}>LOOM</Text>
+            <Text style={styles.brandMark}>TRACE</Text>
             <Text style={styles.tagline}>Your personal movie & TV memory.</Text>
           </View>
 
@@ -85,9 +85,9 @@ export default function Login() {
               <Text style={styles.googleText}>{busy === 'google' ? 'Opening…' : 'Continue with Google'}</Text>
             </Pressable>
 
-            <Link href="/(auth)/register" asChild>
+            <Link href="/(auth)/onboarding" asChild>
               <Pressable testID="login-goto-register" style={styles.footerRow}>
-                <Text style={styles.footerMuted}>New to Loom?</Text>
+                <Text style={styles.footerMuted}>New to Trace?</Text>
                 <Text style={styles.footerLink}>Create account</Text>
               </Pressable>
             </Link>

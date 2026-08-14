@@ -35,7 +35,7 @@ export default function Register() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.brandMark}>LOOM</Text>
+            <Text style={styles.brandMark}>TRACE</Text>
             <Text style={styles.tagline}>Start your memory vault.</Text>
           </View>
 

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 4 QA regression pass for Trace (formerly Loom) with REAL TMDB now active. PRIMARY BUG FIX VERIFIED: onboarding 'Dimensions is not defined' crash is fully resolved — from Login → Create account (login-goto-register) loads onboarding-screen without any red-box, all 5 slides (welcome/share/sources/ai/lists) render via index-driven state, onboarding-next advances slide-by-slide, onboarding-dot-<i> jumps, onboarding-skip and final 'Get Started' both navigate to register, onboarding-goto-login returns to login. Zero pageerrors and zero 'is not defined' errors captured across every flow tested. Backend: 15/15 iteration-3 pytest tests still pass in 26.7s against the deployed EXPO_PUBLIC_BACKEND_URL (auth + auto-save + library filters/sort + collections multi-select/batch + search). Full E2E frontend flow on 390×844 mobile viewport (Expo web): register (@gmail.com) → home-screen; add-discovery text 'Interstellar (2014) and Arrival (2016)' → add-saved-banner 'Auto-saved 2 title(s)…' + app-toast 'Saved to library: Interstellar, Arrival' + both detection cards show '✓ In your library'; Library populates with REAL TMDB posters for Interstellar + Arrival; opening Arrival shows movie-detail-screen with real backdrop/poster, MOVIE · 2016, ★7.6, 116m, director Denis Villeneuve, full cast, genres (Drama/Sci-Fi/Mystery), 'Where to watch' with providers (Apple TV, Paramount+, Paramount+ Essential), detail-play-trailer visible; Lists → Create New List (lists-create-button) opens list-new-screen with 2 selectable library items (list-select-<id>), name + multi-select + list-new-submit → navigates to /list/col_… showing both posters + 'Add titles from library' which re-opens list-new-screen in add mode; Search screen renders with search-input + suggestion chips + search-submit; profile-logout-button logs out, then login-email/password/submit lands back on home-screen. TMDB enrichment (posters, ratings, runtime, director, cast, genres, watch providers, trailers) is fully functional now with the valid 32-hex TMDB_API_KEY. Deprecated ImagePicker.MediaTypeOptions.Images from prior iteration is still present but not blocking any tested flow.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "Deprecated `ImagePicker.MediaTypeOptions.Images` is still used. In expo-image-picker v16+/17+ this enum is removed — pass `mediaTypes: ['images']` (or the string 'images') instead. Reference: /app/frontend/app/add-discovery.tsx:41 (carried over from iteration 3, not tested-blocking)."},
+      {"component": "RN-Web", "issue": "Console emits 'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' warnings — cosmetic on web preview only."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_3.py",
+    "/app/test_reports/pytest/pytest_iter4.xml"
+  ],
+  "action_items": [
+    "None blocking. (Carry-over) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41 to future-proof against expo-image-picker v16+ removal.",
+    "(Optional cleanup) Migrate shadow*/props.pointerEvents to style equivalents to silence RN-Web deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "onboarding.tsx refactor is clean — index-driven state, no FlatList/Dimensions imports, all interactive elements have testIDs. Safe-area handled via useSafeAreaInsets. No issues.",
+    "server.py still ~800 lines; recommend router split (auth/discoveries/library/collections/search) before adding more endpoints (carry-over).",
+    "add-discovery still has a per-detection manual save button behind a candidate flow — unreachable for confidence≥0.5 auto-saves (they show 'In your library' badge). Consider removing entirely to reduce surface area (carry-over).",
+    "list/new.tsx dual-purpose (create + add-titles) via ?listId= param works well but doubles route responsibility."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (15/15 iteration-3 tests re-passed in 26.7s)",
+    "frontend": "100% of tested flows (onboarding 5-slide navigation, register→home, logout→login→home, add-discovery text auto-save with real TMDB enrichment, library posters + sort menu + filters, movie-detail with poster/backdrop/rating/runtime/director/cast/genres/providers/trailer, lists create multi-select + add-titles-from-library, search screen)"
+  },
+  "seed_data_creation": "Per-run @gmail.com iter4_/iter4b_/iter4c_ users; libraries auto-populated via /discoveries auto-save. TEST_-prefixed collections created during tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend URL from EXPO_PUBLIC_BACKEND_URL (currently https://media-vault-api.preview.emergentagent.com). Run pytest with -o 'addopts=' to disable xdist (module-scoped fixtures). TMDB_API_KEY in backend/.env is NOW A VALID 32-hex key — poster_url/backdrop_url/tmdb_rating/runtime/trailer_key/watch_providers/genres/cast/director all populate on real Gemini detections. AI (Gemini 3 Flash via EMERGENT_LLM_KEY) takes 5-15s per discovery. Register uses @gmail.com only (.test rejected 422). Testing sequence: /(auth)/login → login-goto-register → onboarding-screen (5 slides via onboarding-next/onboarding-dot-<i>) → register-email/password/submit → home-screen. Add-discovery testIDs: add-mode-{url|text|image}, add-text-input, add-submit-button (NOT add-analyze-button), add-saved-banner, app-toast. List creation: lists-create-button → list-new-screen with list-new-name + list-select-<entry_id> chips + list-new-submit → /list/{col_id} with list-add-titles. Movie detail: library-item-{entry_id} → movie-detail-screen with detail-providers + detail-play-trailer.",
+  "rca_of_issue": "Primary Dimensions crash RCA: previous onboarding.tsx had removed the FlatList + Dimensions imports mid-refactor but still referenced them in the render tree, throwing 'Dimensions is not defined' at first render. Current implementation (verified) uses only `useState<number>(0)` for slide index and renders `SLIDES[index]` — no Dimensions/FlatList anywhere. Verified by 0 pageerrors + 0 'is not defined' console errors + successful navigation across all 5 slides + dot jumps + skip + goto-login + Get Started."
+}
