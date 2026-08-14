@@ -1,7 +1,17 @@
 // Minimal API client for Trace
 import { storage } from '@/src/utils/storage';
 
-const BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+const RAW_BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
+
+// Safety net for deployment: a PRODUCTION build (__DEV__ === false) must never talk
+// to the preview backend. If the preview URL leaked into the production bundle
+// (preview→prod env rewrite didn't apply), derive the production host from it.
+// We only rewrite in non-dev builds, so the preview/dev experience is untouched.
+// The production host is DERIVED from the preview URL — no hardcoded URL.
+const BASE =
+  !__DEV__ && RAW_BASE.includes('.preview.emergentagent.com')
+    ? RAW_BASE.replace('.preview.emergentagent.com', '.emergent.host')
+    : RAW_BASE;
 
 let inMemoryToken: string | null = null;
 

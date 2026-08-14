@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 6 — regression check for the production-URL safety net added to /app/frontend/src/api/client.ts (`BASE = !__DEV__ && RAW_BASE.includes('.preview.emergentagent.com') ? RAW_BASE.replace('.preview…','.emergent.host') : RAW_BASE`). Because preview is __DEV__ === true, the conditional short-circuits and RAW_BASE is used unchanged — the fix must be invisible here, which is exactly what was verified. Frontend-only run on 390×844 mobile viewport against EXPO_PUBLIC_BACKEND_URL=https://media-vault-api.preview.emergentagent.com. ALL requested flows PASS: (1) Register new user iter6c_1786720069@gmail.com via register-email-input/register-password-input/register-submit-button → home-screen. (2) Onboarding — login-goto-register from login → onboarding-screen loaded, advanced through all 5 slides via onboarding-next, onboarding-skip → register-screen (also independently verified skip route). (3) Logout — profile-logout-button (reached by tapping the 'Profile' tab; note: tabBarTestID='tab-profile' does not render as data-testid on RN-Web so text tap is used) → login-screen. (4) Wrong password — login-error shows exactly 'Invalid credentials' (non-blank, backend detail propagated by hardened client). (5) Login with correct creds → home-screen. (6) Regression — home-screen loads, tab-library shows library-screen with filter chips, home-add-fab opens add-discovery-screen, add-mode-text + add-text-input='Interstellar (2014)' + add-submit-button → add-saved-banner 'Auto-saved 1 title(s) to your library' and movie-detail-screen renders REAL TMDB data (rating 8.5, 169m runtime, 'Directed by Christopher Nolan', cast McConaughey/Hathaway/Chastain/Affleck, genres Adventure/Drama/Science Fiction, watch providers Amazon Prime/Hulu/Paramount+ with logos). Zero page errors, zero red screens. Only console errors are expected pre-auth 401 on /home ('Missing bearer token') and RN-Web cosmetic warnings (shadow*, pointerEvents, useNativeDriver) — all carry-over from prior iterations. The preview code path of client.ts is regression-free after the added production rewrite branch.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "Deprecated `ImagePicker.MediaTypeOptions.Images` still used. Reference: /app/frontend/app/add-discovery.tsx:41 (carry-over from iter3–iter5)."},
+      {"component": "RN-Web (Animated)", "issue": "'Animated: useNativeDriver is not supported…' warning on add-saved-banner animation — web-only cosmetic."},
+      {"component": "RN-Web", "issue": "'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' warnings — cosmetic on web preview only."},
+      {"component": "react-navigation tabBarTestID", "issue": "tabBarTestID='tab-profile' (and other tabs) declared in /app/frontend/app/(tabs)/_layout.tsx:69 does not render as a data-testid attribute on RN-Web — tests must fall back to text/role selectors for tab bar. Non-blocking; consider adding testID via a custom tabBarButton for better testability on web."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_6.json"],
+  "action_items": [
+    "None blocking — /app/frontend/src/api/client.ts change is safe to ship (preview path untouched, prod rewrite gated on __DEV__ === false).",
+    "(Carry-over) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41.",
+    "(Optional) Add explicit testID to bottom tabs via `tabBarButton` on RN-Web so tab-profile/tab-library/tab-home are queryable via data-testid.",
+    "(Reminder to main agent) The production URL-rewrite branch (line 12–14 of client.ts) CANNOT be exercised in the preview environment — only a production build (__DEV__ === false) with EXPO_PUBLIC_BACKEND_URL still pointing at *.preview.emergentagent.com will trigger it. Verify in a real prod bundle that: (a) RAW_BASE includes '.preview.emergentagent.com' → BASE ends in '.emergent.host', and (b) if the prod env var already points at '.emergent.host' the includes() check is false and BASE is used as-is (no double-rewrite)."
+  ],
+  "critical_code_review_comments": [
+    "client.ts BASE derivation is safe: the `.replace('.preview.emergentagent.com', '.emergent.host')` is a first-match string replace, and because the source substring is unique in the URL (host segment only) there is no risk of accidentally rewriting a path/query. Good.",
+    "Rewrite is gated on `!__DEV__` so preview/dev is 100% unaffected — the empirical regression run confirms this.",
+    "The condition uses `.includes('.preview.emergentagent.com')` which is correct even if RAW_BASE has a trailing path; however if a future prod URL happened to contain '.preview.emergentagent.com' as a substring the rewrite would still fire. Acceptable given the closed set of Emergent hostnames.",
+    "No hardcoded production URL — the target host is DERIVED from the preview URL via .replace(), which satisfies the safety-net requirement without leaking prod hostnames into the bundle."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run)", "frontend": "100% (6/6 requested flows in preview)"},
+  "seed_data_creation": "Test users created via register in preview: iter6_1786719803@gmail.com, iter6b_1786719917@gmail.com, iter6c_1786720069@gmail.com (all password 'secret123'). iter6c library has 1 auto-saved entry: Interstellar (2014, tmdb rating 8.5).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The prod-URL rewrite in client.ts (lines 11–14) is DEAD CODE in preview because __DEV__===true. If a future testing agent needs to prove the rewrite works, they must (a) build in production mode (expo export --dev false or actual prod bundle) or (b) temporarily patch client.ts to drop the `!__DEV__` guard and confirm the rewritten BASE (…emergent.host) resolves in the browser. All preview flows continue to use testIDs unchanged from iter4/iter5. Note that RN-Web does NOT expose react-navigation tabBarTestID as a DOM data-testid — use text ('Home'/'Library'/'Profile') as a fallback when scripting tab-bar taps.",
+  "rca_of_issue": "N/A — no regression. The conditional `!__DEV__ && RAW_BASE.includes('.preview.emergentagent.com')` evaluates to false in the preview build (because __DEV__ is true), so BASE === RAW_BASE, and every request continues to hit https://media-vault-api.preview.emergentagent.com/api… exactly as before. All auth (register/login/logout/wrong-password), onboarding, feed, library, add-discovery, TMDB movie-detail flows verified end-to-end with no page errors."
+}
