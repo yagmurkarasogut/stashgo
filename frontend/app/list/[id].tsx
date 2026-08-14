@@ -49,6 +49,15 @@ export default function ListDetail() {
         </Pressable>
       </View>
 
+      <Pressable
+        testID="list-add-titles"
+        onPress={() => router.push(`/list/new?listId=${id}&listName=${encodeURIComponent(list?.name || '')}`)}
+        style={styles.addBtn}
+      >
+        <Ionicons name="add" size={18} color={colors.onBrand} />
+        <Text style={styles.addBtnText}>Add titles from library</Text>
+      </Pressable>
+
       <FlatList
         data={entries}
         keyExtractor={(i) => i.entry_id}
@@ -80,6 +89,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomColor: colors.border, borderBottomWidth: 0.5 },
   title: { color: colors.onSurface, fontSize: 20, fontWeight: '700' },
   count: { color: colors.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.brand, borderRadius: radius.md, paddingVertical: 12 },
+  addBtnText: { color: colors.onBrand, fontSize: 14, fontWeight: '700' },
   empty: { alignItems: 'center', marginTop: spacing.xxxl, paddingHorizontal: spacing.xl },
   emptyText: { color: colors.onSurfaceTertiary, fontSize: 13, textAlign: 'center' },
 });

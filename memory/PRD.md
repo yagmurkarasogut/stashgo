@@ -49,6 +49,15 @@ Build the complete backend architecture and product foundation for **Loom**, an 
 - **P4 Custom Lists:** `Lists` tab + list detail; a title can belong to multiple lists; add/remove from lists inline on Movie detail; list cards show cover stack + count.
 - 15/15 new backend pytest passing; all frontend flows verified — 2026-06
 
+### Iteration 3 — Real TMDB, Auto-Save, Trailers, Multi-select Lists (2026-06)
+- **Real TMDB (mock removed):** `services/tmdb.py` is real-API only — media_type-specific search with year param + candidate scoring + fallback (drop year / try both types); details include poster, backdrop, year, genres, tmdb_rating, overview, runtime, cast, director, **trailer (YouTube key)** and **streaming/watch providers**. `get_details(media_type, id)` fetches directly by id. Graceful AI-only fallback (negative tmdb_id) when TMDB unreachable/no key.
+- **Auto-analysis + auto-save:** `/discoveries` auto-saves every detection ≥0.5 confidence to the library (no manual button); returns `saved_count`; frontend shows a confirmation Toast + banner. Deep-link `?shared_url=` auto-starts analysis.
+- **Multimodal AI (frame analysis):** URL analysis downloads the og:image thumbnail/representative frame and sends it to Gemini vision alongside text signals for visual identification.
+- **Movie detail:** plays YouTube trailer (WebView) when available else poster/backdrop; 'Where to watch' provider logos; full metadata (rating, runtime, genres, cast, director).
+- **Custom Lists redesign:** 'Create New List' is a full page (`/list/new`) with library multi-select (checkboxes); list detail has 'Add titles from library' (batch multi-select add). `POST /collections` accepts initial `entry_ids`; `POST /collections/{id}/items/batch`.
+- 15/15 iteration-3 backend pytest passing; all frontend flows verified — 2026-06
+- ⚠️ Real TMDB art/trailers/providers require a valid 32-char v3 TMDB key in `TMDB_API_KEY` (current value is an invalid placeholder).
+
 ## Backlog / Remaining
 - **P1:** Custom lists (separate from collections), Apple Sign-In, native iOS Share Extension + Android Share Intent workflow (requires native build)
 - **P1:** Real TMDB key wiring (user to provide) — infra already in place

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, Discovery, Detection } from '@/src/api/client';
+import { api, Discovery } from '@/src/api/client';
+import { useToast } from '@/src/context/ToastContext';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 type Mode = 'url' | 'text' | 'screenshot';
@@ -19,6 +20,8 @@ const MODES: { key: Mode; label: string; icon: any }[] = [
 export default function AddDiscovery() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const params = useLocalSearchParams<{ shared_url?: string; autostart?: string }>();
   const [mode, setMode] = useState<Mode>('url');
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
@@ -35,13 +38,33 @@ export default function AddDiscovery() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { setErr('Media library permission required'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       base64: true,
       quality: 0.7,
     });
     if (!res.canceled && res.assets[0]) {
       setImageBase64(res.assets[0].base64 || null);
       setImagePreview(res.assets[0].uri);
+    }
+  };
+
+  const runAnalysis = async (payload: any) => {
+    setBusy(true); setErr('');
+    try {
+      const res = await api.post<Discovery>('/discoveries', payload);
+      setResult(res);
+      const n = res.saved_count ?? res.detections.filter((d) => d.saved).length;
+      if (n > 0) {
+        const names = res.detections.filter((d) => d.saved).map((d) => d.title).slice(0, 2).join(', ');
+        toast.show(`Saved to library: ${names}${n > 2 ? ` +${n - 2} more` : ''}`, 'success');
+      } else {
+        toast.show('Analyzed — no confident match found', 'info');
+      }
+    } catch (e: any) {
+      setErr(e?.detail || 'Failed to analyze');
+      toast.show('Analysis failed', 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -59,16 +82,20 @@ export default function AddDiscovery() {
       body.image_base64 = imageBase64;
       body.image_mime = 'image/jpeg';
     }
-    setBusy(true);
-    try {
-      const res = await api.post<Discovery>('/discoveries', body);
-      setResult(res);
-    } catch (e: any) {
-      setErr(e?.detail || 'Failed to analyze');
-    } finally {
-      setBusy(false);
-    }
+    await runAnalysis(body);
   };
+
+  // Auto-start when arriving from a share action (deep link)
+  useEffect(() => {
+    if (params.shared_url && !result && !busy) {
+      setMode('url');
+      setUrl(String(params.shared_url));
+      if (params.autostart === '1') {
+        runAnalysis({ kind: 'url', url: String(params.shared_url) });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.shared_url]);
 
   const saveDetection = async (cand: { tmdb_id?: number; media_type: 'movie' | 'tv'; title: string }, groupKey: string) => {
     if (!cand.tmdb_id) return;
@@ -81,8 +108,10 @@ export default function AddDiscovery() {
         discovery_id: result?.discovery_id,
       });
       setSaved(new Set([...saved, groupKey]));
+      toast.show(`Saved "${cand.title}" to library`, 'success');
     } catch (e) {
       console.warn('save failed', e);
+      toast.show('Could not save', 'error');
     } finally {
       setSaving(null);
     }
@@ -174,15 +203,24 @@ export default function AddDiscovery() {
             </>
           ) : (
             <View style={{ padding: spacing.lg }}>
+              {(result.saved_count ?? result.detections.filter((d) => d.saved).length) > 0 ? (
+                <View style={styles.savedBanner} testID="add-saved-banner">
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                  <Text style={styles.savedBannerText}>
+                    Auto-saved {result.saved_count ?? result.detections.filter((d) => d.saved).length} title(s) to your library
+                  </Text>
+                </View>
+              ) : null}
+
               <Text style={styles.resultTitle}>AI Summary</Text>
               <Text style={styles.summary}>{result.ai_summary || '—'}</Text>
-              {result.caption ? <Text style={styles.caption}>"{result.caption}"</Text> : null}
+              {result.caption ? <Text style={styles.caption}>{`“${result.caption}”`}</Text> : null}
 
               <Text style={[styles.resultTitle, { marginTop: spacing.xl }]}>
                 Detected {result.detections.length > 0 ? `(${result.detections.length})` : ''}
               </Text>
               {result.detections.length === 0 ? (
-                <Text style={styles.noneDetected}>No movies or TV shows detected — Loom won't guess when it isn't sure.</Text>
+                <Text style={styles.noneDetected}>{`No movies or TV shows detected — Loom won't guess when it isn't sure.`}</Text>
               ) : (
                 result.detections.map((d, i) => {
                   const candidates = [
@@ -192,11 +230,13 @@ export default function AddDiscovery() {
                   const sel = picked[i] ?? 0;
                   const chosen = candidates[sel] || candidates[0];
                   const key = `${chosen.tmdb_id}-${chosen.media_type}`;
-                  const isSaved = saved.has(key);
+                  const autoSaved = !!d.saved && sel === 0;
+                  const isSaved = autoSaved || saved.has(key);
                   const lowConf = d.confidence < 0.75;
                   const showPicker = candidates.length > 1;
                   return (
-                    <View key={i} style={styles.detRow} testID={`detection-${i}`}>
+                    <Pressable key={i} style={styles.detRow} testID={`detection-${i}`}
+                      onPress={() => d.entry_id && router.replace(`/movie/${d.entry_id}`)}>
                       <Image source={{ uri: chosen.poster_url || IMAGES.posterFallback }} style={styles.detPoster} contentFit="cover" />
                       <View style={{ flex: 1, padding: spacing.md }}>
                         <Text style={styles.detTitle}>{chosen.title}</Text>
@@ -204,7 +244,7 @@ export default function AddDiscovery() {
                         {lowConf ? (
                           <View style={styles.lowConfBadge}>
                             <Ionicons name="help-circle-outline" size={12} color={colors.warning} />
-                            <Text style={styles.lowConfText}>Not fully sure — pick the right one</Text>
+                            <Text style={styles.lowConfText}>Not fully sure — pick the right one below</Text>
                           </View>
                         ) : null}
                         {d.reason ? <Text style={styles.detReason} numberOfLines={2}>{d.reason}</Text> : null}
@@ -226,17 +266,23 @@ export default function AddDiscovery() {
                           </View>
                         ) : null}
 
-                        <Pressable
-                          testID={`detection-save-${i}`}
-                          onPress={() => saveDetection(chosen, key)}
-                          disabled={isSaved || saving === key}
-                          style={[styles.saveBtn, isSaved && { backgroundColor: colors.success }]}
-                        >
-                          {saving === key ? <ActivityIndicator size="small" color={colors.onBrand} /> :
-                            <Text style={styles.saveBtnText}>{isSaved ? '✓ Saved to library' : '+ Save to library'}</Text>}
-                        </Pressable>
+                        {isSaved ? (
+                          <View style={[styles.saveBtn, { backgroundColor: colors.success }]}>
+                            <Text style={styles.saveBtnText}>✓ In your library</Text>
+                          </View>
+                        ) : (
+                          <Pressable
+                            testID={`detection-save-${i}`}
+                            onPress={() => saveDetection(chosen, key)}
+                            disabled={saving === key}
+                            style={styles.saveBtn}
+                          >
+                            {saving === key ? <ActivityIndicator size="small" color={colors.onBrand} /> :
+                              <Text style={styles.saveBtnText}>+ Save this one instead</Text>}
+                          </Pressable>
+                        )}
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })
               )}
@@ -268,6 +314,8 @@ const styles = StyleSheet.create({
   submit: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand, marginHorizontal: spacing.lg, paddingVertical: 14, borderRadius: radius.md },
   submitText: { color: colors.onBrand, fontWeight: '700', fontSize: 15 },
   resultTitle: { color: colors.onSurfaceTertiary, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing.sm },
+  savedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(62,123,90,0.15)', borderColor: colors.success, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg },
+  savedBannerText: { color: colors.onSurface, fontSize: 13, fontWeight: '600', flexShrink: 1 },
   summary: { color: colors.onSurface, fontSize: 14, lineHeight: 20 },
   caption: { color: colors.onSurfaceSecondary, fontSize: 13, fontStyle: 'italic', marginTop: spacing.md },
   noneDetected: { color: colors.onSurfaceTertiary, fontSize: 13, fontStyle: 'italic' },

@@ -45,6 +45,14 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
+def _fallback_tmdb_id(title: str, media_type: str) -> int:
+    """Deterministic negative pseudo-id for AI detections not yet matched to TMDB
+    (keeps them out of the real positive TMDB id space)."""
+    import hashlib
+    h = int(hashlib.md5(f"{title.lower()}|{media_type}".encode()).hexdigest(), 16)
+    return -(h % 2_000_000_000) - 1
+
+
 # ---------- MODELS ----------
 class UserRegister(BaseModel):
     email: EmailStr
@@ -100,6 +108,8 @@ class Detection(BaseModel):
     tmdb_id: Optional[int] = None
     poster_url: Optional[str] = None
     year: Optional[int] = None
+    saved: bool = False
+    entry_id: Optional[str] = None
     alternatives: List[AltCandidate] = []
 
 
@@ -113,6 +123,7 @@ class Discovery(BaseModel):
     extracted_text: str = ""
     ai_summary: str = ""
     detections: List[Detection] = []
+    saved_count: int = 0
     created_at: datetime
 
 
@@ -131,6 +142,8 @@ class LibraryEntry(BaseModel):
     backdrop_url: Optional[str] = None
     runtime: Optional[int] = None
     tmdb_rating: Optional[float] = None
+    trailer_key: Optional[str] = None
+    watch_providers: List[Dict[str, Any]] = []
     watch_status: Literal["want_to_watch", "watching", "watched"] = "want_to_watch"
     user_rating: Optional[float] = None
     user_note: str = ""
@@ -159,6 +172,7 @@ class Collection(BaseModel):
 class CollectionCreate(BaseModel):
     name: str
     description: str = ""
+    entry_ids: List[str] = []
 
 
 class SearchQuery(BaseModel):
@@ -305,13 +319,31 @@ async def logout(authorization: Optional[str] = Header(None)):
 async def _enrich_detections(raw: List[Dict]) -> List[Dict]:
     enriched = []
     for d in raw:
-        info = await tmdb_svc.search_and_enrich(d["title"], d.get("media_type"))
+        info = await tmdb_svc.search_and_enrich(d["title"], d.get("media_type"), d.get("year"))
         if not info:
-            continue
+            # No TMDB match (or no valid API key yet) — keep the AI detection so the
+            # user still captures it. Full art/metadata fills in once TMDB is reachable.
+            info = {
+                "tmdb_id": _fallback_tmdb_id(d["title"], d.get("media_type", "movie")),
+                "media_type": d.get("media_type", "movie"),
+                "title": d["title"],
+                "year": d.get("year"),
+                "overview": "",
+                "director": None,
+                "cast": [],
+                "genres": [],
+                "runtime": None,
+                "tmdb_rating": None,
+                "poster_url": None,
+                "backdrop_url": None,
+                "trailer_key": None,
+                "watch_providers": [],
+                "_unmatched": True,
+            }
         # enrich alternatives lightly so the user can pick the right one
         alt_out = []
         for a in d.get("alternatives", [])[:2]:
-            ainfo = await tmdb_svc.search_and_enrich(a["title"], a.get("media_type"))
+            ainfo = await tmdb_svc.search_and_enrich(a["title"], a.get("media_type"), a.get("year"))
             if ainfo:
                 alt_out.append({
                     "title": ainfo["title"],
@@ -329,11 +361,55 @@ async def _enrich_detections(raw: List[Dict]) -> List[Dict]:
             "tmdb_id": info["tmdb_id"],
             "poster_url": info.get("poster_url"),
             "year": info.get("year"),
+            "saved": False,
+            "entry_id": None,
             "alternatives": alt_out,
+            "_info": info,  # full enriched details, used for auto-save
         })
     # order by confidence (best first)
     enriched.sort(key=lambda x: x.get("confidence", 0), reverse=True)
     return enriched
+
+
+async def _upsert_library_entry(user_id: str, info: Dict, discovery_id: Optional[str] = None) -> Dict:
+    """Insert a library entry from already-enriched TMDB `info`, or return existing."""
+    existing = await db.library.find_one(
+        {"user_id": user_id, "tmdb_id": info["tmdb_id"], "media_type": info["media_type"]},
+        {"_id": 0},
+    )
+    if existing:
+        return existing
+    entry = {
+        "entry_id": new_id("lib"),
+        "user_id": user_id,
+        "tmdb_id": info["tmdb_id"],
+        "media_type": info["media_type"],
+        "title": info.get("title"),
+        "year": info.get("year"),
+        "overview": info.get("overview", ""),
+        "director": info.get("director"),
+        "cast": info.get("cast", []),
+        "genres": info.get("genres", []),
+        "poster_url": info.get("poster_url"),
+        "backdrop_url": info.get("backdrop_url"),
+        "runtime": info.get("runtime"),
+        "tmdb_rating": info.get("tmdb_rating"),
+        "trailer_key": info.get("trailer_key"),
+        "watch_providers": info.get("watch_providers", []),
+        "watch_status": "want_to_watch",
+        "user_rating": None,
+        "user_note": "",
+        "discovery_id": discovery_id,
+        "created_at": now_utc(),
+        "updated_at": now_utc(),
+    }
+    await db.library.insert_one(entry)
+    entry.pop("_id", None)
+    return entry
+
+
+# minimum confidence for a detection to be auto-saved to the library
+AUTO_SAVE_THRESHOLD = 0.5
 
 
 @api.post("/discoveries", response_model=Discovery)
@@ -364,8 +440,20 @@ async def create_discovery(body: DiscoveryCreate, user=Depends(get_current_user)
         raise HTTPException(status_code=400, detail="invalid kind")
 
     enriched = await _enrich_detections(ai.get("detections", []))
+
+    # Auto-save every confident detection to the library (no manual step needed)
+    saved_count = 0
+    discovery_id = new_id("disc")
+    for det in enriched:
+        info = det.pop("_info", None)
+        if info and det.get("confidence", 0) >= AUTO_SAVE_THRESHOLD:
+            entry = await _upsert_library_entry(user["user_id"], info, discovery_id)
+            det["saved"] = True
+            det["entry_id"] = entry["entry_id"]
+            saved_count += 1
+
     doc = {
-        "discovery_id": new_id("disc"),
+        "discovery_id": discovery_id,
         "user_id": user["user_id"],
         "kind": body.kind,
         "source_platform": source_platform,
@@ -374,6 +462,7 @@ async def create_discovery(body: DiscoveryCreate, user=Depends(get_current_user)
         "extracted_text": ai.get("extracted_text", ""),
         "ai_summary": ai.get("ai_summary", ""),
         "detections": enriched,
+        "saved_count": saved_count,
         "created_at": now_utc(),
     }
     await db.discoveries.insert_one(doc)
@@ -413,38 +502,27 @@ class LibrarySaveBody(BaseModel):
 
 @api.post("/library", response_model=LibraryEntry)
 async def save_to_library(body: LibrarySaveBody, user=Depends(get_current_user)):
-    # dedupe by (user, tmdb_id, media_type)
     existing = await db.library.find_one(
         {"user_id": user["user_id"], "tmdb_id": body.tmdb_id, "media_type": body.media_type},
         {"_id": 0},
     )
     if existing:
         return existing
-    info = await tmdb_svc.search_and_enrich(body.title, body.media_type) or {}
-    entry = {
-        "entry_id": new_id("lib"),
-        "user_id": user["user_id"],
-        "tmdb_id": body.tmdb_id,
-        "media_type": body.media_type,
-        "title": info.get("title", body.title),
-        "year": info.get("year"),
-        "overview": info.get("overview", ""),
-        "director": info.get("director"),
-        "cast": info.get("cast", []),
-        "genres": info.get("genres", []),
-        "poster_url": info.get("poster_url"),
-        "backdrop_url": info.get("backdrop_url"),
-        "runtime": info.get("runtime"),
-        "tmdb_rating": info.get("tmdb_rating"),
-        "watch_status": "want_to_watch",
-        "user_rating": None,
-        "user_note": "",
-        "discovery_id": body.discovery_id,
-        "created_at": now_utc(),
-        "updated_at": now_utc(),
-    }
-    await db.library.insert_one(entry)
-    entry.pop("_id", None)
+    # fetch full details directly by id (accurate — no re-search by title)
+    info = await tmdb_svc.get_details(body.media_type, body.tmdb_id) if body.tmdb_id > 0 else None
+    if not info:
+        info = await tmdb_svc.search_and_enrich(body.title, body.media_type)
+    if not info:
+        # keep the capture even without TMDB enrichment
+        info = {
+            "tmdb_id": body.tmdb_id if body.tmdb_id != 0 else _fallback_tmdb_id(body.title, body.media_type),
+            "media_type": body.media_type,
+            "title": body.title,
+            "year": None, "overview": "", "director": None, "cast": [], "genres": [],
+            "runtime": None, "tmdb_rating": None, "poster_url": None, "backdrop_url": None,
+            "trailer_key": None, "watch_providers": [],
+        }
+    entry = await _upsert_library_entry(user["user_id"], info, body.discovery_id)
     return entry
 
 
@@ -532,11 +610,13 @@ async def create_collection(body: CollectionCreate, user=Depends(get_current_use
         "user_id": user["user_id"],
         "name": body.name,
         "description": body.description,
-        "entry_ids": [],
+        "entry_ids": list(dict.fromkeys(body.entry_ids)),
         "created_at": now_utc(),
     }
     await db.collections.insert_one(doc)
     doc.pop("_id", None)
+    doc["item_count"] = len(doc["entry_ids"])
+    doc["cover_posters"] = []
     return doc
 
 
@@ -597,6 +677,10 @@ class CollectionItemBody(BaseModel):
     entry_id: str
 
 
+class CollectionBatchBody(BaseModel):
+    entry_ids: List[str] = []
+
+
 @api.post("/collections/{collection_id}/items")
 async def add_to_collection(collection_id: str, body: CollectionItemBody, user=Depends(get_current_user)):
     r = await db.collections.update_one(
@@ -606,6 +690,17 @@ async def add_to_collection(collection_id: str, body: CollectionItemBody, user=D
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Collection not found")
     return {"ok": True}
+
+
+@api.post("/collections/{collection_id}/items/batch")
+async def batch_add_to_collection(collection_id: str, body: CollectionBatchBody, user=Depends(get_current_user)):
+    r = await db.collections.update_one(
+        {"collection_id": collection_id, "user_id": user["user_id"]},
+        {"$addToSet": {"entry_ids": {"$each": body.entry_ids}}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    return {"ok": True, "added": len(body.entry_ids)}
 
 
 @api.delete("/collections/{collection_id}/items/{entry_id}")

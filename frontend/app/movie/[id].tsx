@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Platform } from 'react-native';
 import { Image } from 'expo-image';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
+import { useToast } from '@/src/context/ToastContext';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 const STATUSES: { key: LibraryEntry['watch_status']; label: string; icon: any }[] = [
@@ -25,6 +27,8 @@ export default function MovieDetail() {
   const [lists, setLists] = useState<{ collection_id: string; name: string; contains: boolean; item_count: number }[]>([]);
   const [newListName, setNewListName] = useState('');
   const [creatingList, setCreatingList] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
+  const toast = useToast();
 
   const loadLists = useCallback(async () => {
     try {
@@ -42,7 +46,8 @@ export default function MovieDetail() {
     } finally { setLoading(false); }
   }, [id]);
 
-  useEffect(() => { load(); loadLists(); }, [load, loadLists]);
+  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { loadLists(); }, [loadLists]));
 
   const toggleList = async (listId: string, contains: boolean) => {
     setLists((prev) => prev.map((l) => l.collection_id === listId ? { ...l, contains: !contains } : l));
@@ -93,24 +98,44 @@ export default function MovieDetail() {
     <View style={styles.root} testID="movie-detail-screen">
       <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
         <View style={styles.heroWrap}>
-          <Image source={{ uri: entry.backdrop_url || entry.poster_url || IMAGES.posterFallback }} style={styles.hero} contentFit="cover" />
-          <LinearGradient
-            colors={['rgba(11,13,16,0.2)', 'rgba(11,13,16,0.6)', '#0B0D10']}
-            style={StyleSheet.absoluteFillObject}
-            locations={[0, 0.5, 1]}
-          />
-          <Pressable testID="detail-back" onPress={() => router.back()} style={[styles.backBtn, { top: insets.top + spacing.sm }]}>
-            <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
-          </Pressable>
-          <View style={styles.heroContent}>
-            <Text style={styles.mediaBadge}>{entry.media_type.toUpperCase()} {entry.year ? `· ${entry.year}` : ''}</Text>
-            <Text style={styles.heroTitle}>{entry.title}</Text>
-            {entry.director ? <Text style={styles.heroDir}>Directed by {entry.director}</Text> : null}
-            <View style={styles.metaChips}>
-              {entry.tmdb_rating != null ? (
-                <View style={styles.metaChip}>
-                  <Ionicons name="star" size={12} color={colors.brand} />
-                  <Text style={styles.metaChipText}>{entry.tmdb_rating.toFixed(1)}</Text>
+          {showTrailer && entry.trailer_key ? (
+            <View style={StyleSheet.absoluteFillObject} testID="detail-trailer">
+              <WebView
+                style={{ flex: 1, backgroundColor: '#000' }}
+                allowsInlineMediaPlayback
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled
+                source={{ uri: `https://www.youtube.com/embed/${entry.trailer_key}?autoplay=1&playsinline=1&modestbranding=1&rel=0` }}
+              />
+              <Pressable testID="detail-trailer-close" onPress={() => setShowTrailer(false)} style={[styles.backBtn, { top: insets.top + spacing.sm, right: spacing.md, left: undefined }]}>
+                <Ionicons name="close" size={22} color={colors.onSurface} />
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <Image source={{ uri: entry.backdrop_url || entry.poster_url || IMAGES.posterFallback }} style={styles.hero} contentFit="cover" />
+              <LinearGradient
+                colors={['rgba(11,13,16,0.2)', 'rgba(11,13,16,0.6)', '#0B0D10']}
+                style={StyleSheet.absoluteFillObject}
+                locations={[0, 0.5, 1]}
+              />
+              <Pressable testID="detail-back" onPress={() => router.back()} style={[styles.backBtn, { top: insets.top + spacing.sm }]}>
+                <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
+              </Pressable>
+              {entry.trailer_key ? (
+                <Pressable testID="detail-play-trailer" onPress={() => setShowTrailer(true)} style={styles.playBtn}>
+                  <Ionicons name="play" size={26} color={colors.onBrand} style={{ marginLeft: 3 }} />
+                </Pressable>
+              ) : null}
+              <View style={styles.heroContent}>
+                <Text style={styles.mediaBadge}>{entry.media_type.toUpperCase()} {entry.year ? `· ${entry.year}` : ''}</Text>
+                <Text style={styles.heroTitle}>{entry.title}</Text>
+                {entry.director ? <Text style={styles.heroDir}>Directed by {entry.director}</Text> : null}
+                <View style={styles.metaChips}>
+                  {entry.tmdb_rating != null ? (
+                    <View style={styles.metaChip}>
+                      <Ionicons name="star" size={12} color={colors.brand} />
+                      <Text style={styles.metaChipText}>{entry.tmdb_rating.toFixed(1)}</Text>
                 </View>
               ) : null}
               {entry.runtime ? (
@@ -121,6 +146,8 @@ export default function MovieDetail() {
               ) : null}
             </View>
           </View>
+            </>
+          )}
         </View>
 
         <View style={styles.body}>
@@ -145,6 +172,27 @@ export default function MovieDetail() {
               ))}
             </View>
           )}
+
+          {entry.watch_providers && entry.watch_providers.length > 0 ? (
+            <View style={styles.card} testID="detail-providers">
+              <Text style={styles.cardLabel}>Where to watch</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
+                {entry.watch_providers.map((p, i) => (
+                  <View key={`${p.name}-${i}`} style={styles.provider}>
+                    {p.logo_url ? (
+                      <Image source={{ uri: p.logo_url }} style={styles.providerLogo} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.providerLogo, { alignItems: 'center', justifyContent: 'center' }]}>
+                        <Ionicons name="tv-outline" size={20} color={colors.onSurfaceTertiary} />
+                      </View>
+                    )}
+                    <Text style={styles.providerName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={styles.providerType}>{p.type}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
 
           <View style={styles.card}>
             <Text style={styles.cardLabel}>Watch status</Text>
@@ -252,7 +300,12 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   heroWrap: { height: 420, width: '100%', backgroundColor: colors.surfaceTertiary },
   hero: { ...StyleSheet.absoluteFillObject },
-  backBtn: { position: 'absolute', left: spacing.md, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  backBtn: { position: 'absolute', left: spacing.md, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 5 },
+  playBtn: { position: 'absolute', alignSelf: 'center', top: '38%', width: 64, height: 64, borderRadius: 32, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
+  provider: { width: 72, alignItems: 'center' },
+  providerLogo: { width: 48, height: 48, borderRadius: radius.sm, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border },
+  providerName: { color: colors.onSurface, fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  providerType: { color: colors.onSurfaceTertiary, fontSize: 9, textTransform: 'capitalize' },
   heroContent: { position: 'absolute', bottom: spacing.lg, left: spacing.lg, right: spacing.lg },
   mediaBadge: { color: colors.brand, fontSize: 11, letterSpacing: 2, fontWeight: '700' },
   heroTitle: { color: colors.onSurface, fontSize: 32, fontWeight: '800', marginTop: spacing.xs, lineHeight: 36 },

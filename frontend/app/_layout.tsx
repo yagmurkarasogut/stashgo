@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { useIconFonts } from '@/src/hooks/use-icon-fonts';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
+import { ToastProvider } from '@/src/context/ToastContext';
 import { colors } from '@/src/theme';
 
 LogBox.ignoreAllLogs(true);
@@ -41,6 +42,7 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="add-discovery" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="movie/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="list/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="list/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
@@ -60,7 +62,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="light" />
         <AuthProvider>
-          <AuthGate />
+          <ToastProvider>
+            <AuthGate />
+          </ToastProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

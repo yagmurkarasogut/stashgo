@@ -13,8 +13,7 @@ export default function Lists() {
   const insets = useSafeAreaInsets();
   const [lists, setLists] = useState<CustomList[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -26,47 +25,38 @@ export default function Lists() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const create = async () => {
-    const n = name.trim();
-    if (!n) return;
-    setCreating(true);
-    try {
-      await api.post('/collections', { name: n });
-      setName('');
-      await load();
-    } catch (e) { console.warn(e); }
-    finally { setCreating(false); }
-  };
+  const filtered = lists.filter((l) => l.name.toLowerCase().includes(query.trim().toLowerCase()));
 
   return (
     <View style={styles.root} testID="lists-screen">
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.title}>Custom Lists</Text>
-        <View style={styles.createRow}>
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color={colors.onSurfaceTertiary} style={{ marginLeft: spacing.md }} />
           <TextInput
-            testID="lists-new-input"
-            value={name}
-            onChangeText={setName}
-            placeholder="New list — e.g. Best Horror, Nolan Collection"
+            testID="lists-search-input"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search your lists"
             placeholderTextColor={colors.onSurfaceTertiary}
-            style={styles.input}
-            onSubmitEditing={create}
+            style={styles.searchInput}
           />
-          <Pressable testID="lists-create-button" onPress={create} disabled={creating} style={styles.createBtn}>
-            <Ionicons name="add" size={22} color={colors.onBrand} />
-          </Pressable>
         </View>
+        <Pressable testID="lists-create-button" onPress={() => router.push('/list/new')} style={styles.createBtn}>
+          <Ionicons name="add" size={20} color={colors.onBrand} />
+          <Text style={styles.createBtnText}>Create New List</Text>
+        </Pressable>
       </View>
 
       <FlatList
-        data={lists}
+        data={filtered}
         keyExtractor={(l) => l.collection_id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120, gap: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.brand} />}
         ListEmptyComponent={() => (
           <View style={styles.empty}>
             <Ionicons name="albums-outline" size={40} color={colors.onSurfaceTertiary} />
-            <Text style={styles.emptyText}>No lists yet. Create your first above — a movie can live in as many lists as you like.</Text>
+            <Text style={styles.emptyText}>No lists yet. Tap “Create New List” — a movie can live in as many lists as you like.</Text>
           </View>
         )}
         renderItem={({ item }) => (
@@ -96,9 +86,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomColor: colors.border, borderBottomWidth: 0.5 },
   title: { color: colors.onSurface, fontSize: 28, fontWeight: '700', marginBottom: spacing.md },
-  createRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  input: { flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 11, color: colors.onSurface, fontSize: 13 },
-  createBtn: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
+  searchInput: { flex: 1, paddingHorizontal: spacing.md, paddingVertical: 11, color: colors.onSurface, fontSize: 14 },
+  createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, height: 46, borderRadius: radius.md, backgroundColor: colors.brand },
+  createBtnText: { color: colors.onBrand, fontSize: 14, fontWeight: '700' },
   empty: { alignItems: 'center', marginTop: spacing.xxxl, gap: spacing.md, paddingHorizontal: spacing.xl },
   emptyText: { color: colors.onSurfaceTertiary, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   listCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },

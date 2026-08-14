@@ -17,7 +17,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 SYSTEM_PROMPT = """You are Loom's AI curator — a meticulous expert at identifying the SPECIFIC movie or TV show a piece of social content is about.
 
-You will be given structured SIGNALS extracted from a social post or web page: the page/video TITLE, DESCRIPTION/CAPTION, AUTHOR/channel, HASHTAGS, and any raw on-page TEXT. Weigh them together — the title and caption usually name or strongly hint the title; hashtags (e.g. #theinvitation) and @mentions are high-signal; the author/channel gives context.
+You will be given structured SIGNALS extracted from a social post or web page: the page/video TITLE, DESCRIPTION/CAPTION, AUTHOR/channel, HASHTAGS, and any raw on-page TEXT. You may ALSO be given an IMAGE — a thumbnail or representative frame from the video/post. When an image is present, ANALYZE IT VISUALLY: read on-screen text/subtitles, recognise actors' faces, sets, costumes, logos, and title cards to identify the exact film or show — do NOT rely on the caption alone. Weigh every signal together; hashtags (e.g. #theinvitation) and @mentions are high-signal.
 
 CRITICAL ACCURACY RULES:
 1. NEVER invent or hallucinate a title. Only return titles you can actually justify from the signals. If the signals are too thin to name a title, return an EMPTY detections array — that is the correct answer, not a guess.
@@ -44,10 +44,11 @@ Return STRICT JSON only, no markdown fences, no preamble. Schema:
     {
       "title": "string",
       "media_type": "movie" | "tv",
+      "year": null,
       "confidence": 0.0-1.0,
       "reason": "string (which signals justify this)",
       "alternatives": [
-        {"title": "string", "media_type": "movie"|"tv", "confidence": 0.0-1.0}
+        {"title": "string", "media_type": "movie"|"tv", "year": null, "confidence": 0.0-1.0}
       ]
     }
   ]
@@ -127,7 +128,7 @@ async def fetch_url_signals(url: str) -> Dict:
     JS-rendered pages (IG/TikTok) still expose these meta tags server-side."""
     signals: Dict[str, Any] = {
         "url": url, "title": "", "description": "", "author": "",
-        "hashtags": [], "text": "", "platform": detect_source_platform(url),
+        "hashtags": [], "text": "", "image": "", "platform": detect_source_platform(url),
     }
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -163,9 +164,24 @@ async def fetch_url_signals(url: str) -> Dict:
             signals["text"] = txt[:3000]
 
             signals["hashtags"] = _extract_hashtags(signals["title"], desc, txt[:1500])
+            # og:image is typically the video thumbnail / a representative frame
+            signals["image"] = _meta(html, "og:image", "twitter:image", "og:image:secure_url")
     except Exception:
         pass
     return signals
+
+
+async def _download_image(url: str) -> Optional[bytes]:
+    if not url:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0 LoomBot/1.0"})
+            if r.status_code == 200 and r.content and len(r.content) < 8_000_000:
+                return r.content
+    except Exception:
+        pass
+    return None
 
 
 async def _fetch_url_content(url: str) -> str:
@@ -225,18 +241,32 @@ async def analyze_text(text: str, source_url: Optional[str] = None) -> Dict:
 
 
 async def analyze_url(url: str) -> Dict:
-    """Fetch structured signals from a URL and run analysis on them."""
+    """Fetch structured signals + a thumbnail frame from a URL and run
+    MULTIMODAL analysis (text signals + representative video frame)."""
     signals = await fetch_url_signals(url)
     prompt_body = _signals_to_prompt(signals)
     has_signal = bool(signals.get("title") or signals.get("description") or signals.get("hashtags"))
-    if not has_signal and not signals.get("text"):
-        prompt_body += "\n\n[NOTE] Very little could be extracted from this URL. Only return a detection if the URL slug itself clearly names a title; otherwise return empty detections."
-    result = await analyze_text(prompt_body, source_url=url)
-    # attach signals so caller can persist caption/hashtags
+
+    # Pull the representative frame / thumbnail for visual identification
+    image_bytes = await _download_image(signals.get("image", ""))
+
+    if image_bytes:
+        prompt_body += "\n\nAn IMAGE (thumbnail / representative frame from the video) is attached — analyze it visually to identify the exact title."
+        chat = _new_chat(f"analyze-url-{uuid.uuid4().hex[:8]}")
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        msg = UserMessage(text=prompt_body, file_contents=[ImageContent(image_base64=b64)])
+        reply = await chat.send_message(msg)
+        result = _normalize(_extract_json(reply) or {}, fallback_text=prompt_body)
+    else:
+        if not has_signal and not signals.get("text"):
+            prompt_body += "\n\n[NOTE] Very little could be extracted from this URL. Only return a detection if the URL slug itself clearly names a title; otherwise return empty detections."
+        result = await analyze_text(prompt_body, source_url=url)
+
     result["_signals"] = {
         "title": signals.get("title", ""),
         "author": signals.get("author", ""),
         "hashtags": signals.get("hashtags", []),
+        "image": signals.get("image", ""),
     }
     if not result.get("caption") and signals.get("description"):
         result["caption"] = signals["description"][:200]
@@ -283,11 +313,13 @@ def _normalize(parsed: Dict, fallback_text: str = "") -> Dict:
             alts.append({
                 "title": at,
                 "media_type": a.get("media_type") if a.get("media_type") in ("movie", "tv") else "movie",
+                "year": a.get("year") if isinstance(a.get("year"), int) else None,
                 "confidence": float(a.get("confidence") or 0.4),
             })
         clean.append({
             "title": title,
             "media_type": d.get("media_type") if d.get("media_type") in ("movie", "tv") else "movie",
+            "year": d.get("year") if isinstance(d.get("year"), int) else None,
             "confidence": conf,
             "reason": (d.get("reason") or "")[:300],
             "alternatives": alts[:2],

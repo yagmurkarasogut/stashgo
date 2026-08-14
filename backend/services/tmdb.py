@@ -1,256 +1,254 @@
 """
-TMDB service - full integration layer with mock fallback.
-Uses real TMDB API when TMDB_API_KEY env is set; otherwise deterministic mocks.
+TMDB service — REAL API only (no mock data).
+Fetches poster, backdrop, year, genres, rating, overview, runtime, cast,
+director, trailer (YouTube key) and streaming/watch providers.
+
+Matching strategy:
+  - media_type-specific endpoints (search/movie vs search/tv)
+  - use year (primary_release_year / first_air_date_year) when available
+  - score candidates by normalized-title + year match
+  - fallback: retry search without the year, and if media_type is unknown,
+    try both movie and tv and keep the best-scoring candidate
 """
 import os
-import hashlib
-from typing import Optional, Dict, List
+import re
+import asyncio
+from typing import Optional, Dict, List, Any
 import httpx
 
 TMDB_BASE = "https://api.themoviedb.org/3"
-TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w500"
-
-# Curated mock poster images (Unsplash cinematic portraits)
-MOCK_POSTERS = [
-    "https://images.pexels.com/photos/19830143/pexels-photo-19830143.jpeg",
-    "https://images.unsplash.com/photo-1782899937486-e0eee1d0065c?w=500",
-    "https://images.unsplash.com/photo-1782020934325-cfe4cea4fd9c?w=500",
-    "https://images.unsplash.com/photo-1489599735734-79b4169c2a78?w=500",
-    "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=500",
-    "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=500",
-    "https://images.unsplash.com/photo-1533488069517-424e1c1ab2f7?w=500",
-]
-
-MOCK_CATALOG: Dict[str, Dict] = {
-    "inception": {
-        "id": 27205, "media_type": "movie", "title": "Inception", "year": 2010,
-        "overview": "A thief who steals corporate secrets through dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
-        "director": "Christopher Nolan",
-        "cast": ["Leonardo DiCaprio", "Joseph Gordon-Levitt", "Elliot Page", "Tom Hardy"],
-        "genres": ["Action", "Sci-Fi", "Thriller"],
-    },
-    "interstellar": {
-        "id": 157336, "media_type": "movie", "title": "Interstellar", "year": 2014,
-        "overview": "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.",
-        "director": "Christopher Nolan",
-        "cast": ["Matthew McConaughey", "Anne Hathaway", "Jessica Chastain"],
-        "genres": ["Adventure", "Drama", "Sci-Fi"],
-    },
-    "oppenheimer": {
-        "id": 872585, "media_type": "movie", "title": "Oppenheimer", "year": 2023,
-        "overview": "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb.",
-        "director": "Christopher Nolan",
-        "cast": ["Cillian Murphy", "Emily Blunt", "Robert Downey Jr."],
-        "genres": ["Biography", "Drama", "History"],
-    },
-    "dune": {
-        "id": 438631, "media_type": "movie", "title": "Dune", "year": 2021,
-        "overview": "Feature adaptation of Frank Herbert's science fiction novel about the son of a noble family entrusted with the protection of the most valuable asset in the galaxy.",
-        "director": "Denis Villeneuve",
-        "cast": ["Timothée Chalamet", "Rebecca Ferguson", "Zendaya"],
-        "genres": ["Adventure", "Sci-Fi"],
-    },
-    "the dark knight": {
-        "id": 155, "media_type": "movie", "title": "The Dark Knight", "year": 2008,
-        "overview": "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological tests.",
-        "director": "Christopher Nolan",
-        "cast": ["Christian Bale", "Heath Ledger", "Aaron Eckhart"],
-        "genres": ["Action", "Crime", "Drama"],
-    },
-    "breaking bad": {
-        "id": 1396, "media_type": "tv", "title": "Breaking Bad", "year": 2008,
-        "overview": "A high school chemistry teacher diagnosed with terminal lung cancer turns to manufacturing and selling methamphetamine.",
-        "director": "Vince Gilligan",
-        "cast": ["Bryan Cranston", "Aaron Paul", "Anna Gunn"],
-        "genres": ["Crime", "Drama", "Thriller"],
-    },
-    "severance": {
-        "id": 95396, "media_type": "tv", "title": "Severance", "year": 2022,
-        "overview": "Mark leads a team of office workers whose memories have been surgically divided between their work and personal lives.",
-        "director": "Dan Erickson",
-        "cast": ["Adam Scott", "Britt Lower", "Patricia Arquette"],
-        "genres": ["Drama", "Mystery", "Sci-Fi"],
-    },
-    "the bear": {
-        "id": 136315, "media_type": "tv", "title": "The Bear", "year": 2022,
-        "overview": "A young chef from the fine dining world returns to Chicago to run his family sandwich shop.",
-        "director": "Christopher Storer",
-        "cast": ["Jeremy Allen White", "Ebon Moss-Bachrach", "Ayo Edebiri"],
-        "genres": ["Comedy", "Drama"],
-    },
-    "succession": {
-        "id": 76331, "media_type": "tv", "title": "Succession", "year": 2018,
-        "overview": "The Roy family controls the biggest media conglomerate in the world, and their fight for control amid uncertain health.",
-        "director": "Jesse Armstrong",
-        "cast": ["Brian Cox", "Jeremy Strong", "Kieran Culkin"],
-        "genres": ["Drama"], "runtime": 60, "tmdb_rating": 8.6,
-    },
-    "the invitation": {
-        "id": 265195, "media_type": "movie", "title": "The Invitation", "year": 2015,
-        "overview": "While attending a dinner party at his former home, a man thinks his ex-wife and her new husband have sinister intentions for their guests.",
-        "director": "Karyn Kusama",
-        "cast": ["Logan Marshall-Green", "Tammy Blanchard", "Michiel Huisman"],
-        "genres": ["Thriller", "Horror", "Mystery"], "runtime": 100, "tmdb_rating": 6.6,
-    },
-    "the substance": {
-        "id": 933260, "media_type": "movie", "title": "The Substance", "year": 2024,
-        "overview": "A fading celebrity takes a black-market drug that creates a younger, better version of herself, with monstrous consequences.",
-        "director": "Coralie Fargeat",
-        "cast": ["Demi Moore", "Margaret Qualley", "Dennis Quaid"],
-        "genres": ["Horror", "Sci-Fi", "Drama"], "runtime": 141, "tmdb_rating": 7.3,
-    },
-    "parasite": {
-        "id": 496243, "media_type": "movie", "title": "Parasite", "year": 2019,
-        "overview": "A poor family schemes to become employed by a wealthy household by posing as unrelated, highly qualified individuals.",
-        "director": "Bong Joon-ho",
-        "cast": ["Song Kang-ho", "Lee Sun-kyun", "Cho Yeo-jeong"],
-        "genres": ["Thriller", "Drama", "Comedy"], "runtime": 133, "tmdb_rating": 8.5,
-    },
-    "hereditary": {
-        "id": 493922, "media_type": "movie", "title": "Hereditary", "year": 2018,
-        "overview": "A grieving family is haunted by tragic and disturbing occurrences after the death of their secretive grandmother.",
-        "director": "Ari Aster",
-        "cast": ["Toni Collette", "Alex Wolff", "Milly Shapiro"],
-        "genres": ["Horror", "Thriller", "Drama"], "runtime": 127, "tmdb_rating": 7.3,
-    },
-    "la la land": {
-        "id": 313369, "media_type": "movie", "title": "La La Land", "year": 2016,
-        "overview": "A jazz pianist and an aspiring actress fall in love while pursuing their dreams in Los Angeles.",
-        "director": "Damien Chazelle",
-        "cast": ["Ryan Gosling", "Emma Stone", "John Legend"],
-        "genres": ["Romance", "Drama", "Comedy"], "runtime": 128, "tmdb_rating": 7.9,
-    },
-    "spirited away": {
-        "id": 129, "media_type": "movie", "title": "Spirited Away", "year": 2001,
-        "overview": "A young girl wanders into a world ruled by gods and witches, where humans are turned into beasts.",
-        "director": "Hayao Miyazaki",
-        "cast": ["Rumi Hiiragi", "Miyu Irino", "Mari Natsuki"],
-        "genres": ["Animation", "Fantasy", "Family"], "runtime": 125, "tmdb_rating": 8.5,
-    },
-    "planet earth ii": {
-        "id": 68507, "media_type": "tv", "title": "Planet Earth II", "year": 2016,
-        "overview": "David Attenborough returns for a stunning look at the planet's most iconic habitats and the wildlife within.",
-        "director": "BBC",
-        "cast": ["David Attenborough"],
-        "genres": ["Documentary"], "runtime": 50, "tmdb_rating": 8.5,
-    },
-}
-
-# real runtime/rating for the first batch of titles (kept out of literals above for brevity)
-_MOCK_META = {
-    27205: (148, 8.4), 157336: (169, 8.4), 872585: (181, 8.1), 438631: (155, 7.8),
-    155: (152, 8.5), 1396: (49, 8.9), 95396: (55, 8.4), 136315: (30, 8.5),
-}
+TMDB_IMG = "https://image.tmdb.org/t/p"
+POSTER_SIZE = "w500"
+BACKDROP_SIZE = "w1280"
+PROFILE_SIZE = "w185"
+LOGO_SIZE = "w92"
 
 
-def _poster_for(title: str) -> str:
-    idx = int(hashlib.md5(title.lower().encode()).hexdigest(), 16) % len(MOCK_POSTERS)
-    return MOCK_POSTERS[idx]
+def _api_key() -> str:
+    return os.environ.get("TMDB_API_KEY", "").strip()
 
 
-def _finalize_mock(item: Dict, title: str) -> Dict:
-    """Attach poster/backdrop and ensure runtime + tmdb_rating exist (deterministic)."""
-    item["poster_url"] = _poster_for(item["title"])
-    item["backdrop_url"] = _poster_for(item["title"] + "-bd")
-    item["tmdb_id"] = item.get("id", item.get("tmdb_id"))
-    if item.get("runtime") is None or "runtime" not in item:
-        meta = _MOCK_META.get(item.get("id"))
-        if meta:
-            item.setdefault("runtime", meta[0])
-            item.setdefault("tmdb_rating", meta[1])
-    if "runtime" not in item or item.get("runtime") is None:
-        h = int(hashlib.md5(title.lower().encode()).hexdigest(), 16)
-        item["runtime"] = 45 + (h % 6) * 5 if item.get("media_type") == "tv" else 90 + (h % 12) * 5
-    if "tmdb_rating" not in item or item.get("tmdb_rating") is None:
-        h = int(hashlib.md5((title.lower() + "r").encode()).hexdigest(), 16)
-        item["tmdb_rating"] = round(6.0 + (h % 35) / 10.0, 1)
-    return item
-
-
-def _mock_lookup(title: str, media_type: Optional[str] = None) -> Optional[Dict]:
-    key = title.strip().lower()
-    if key in MOCK_CATALOG:
-        item = MOCK_CATALOG[key].copy()
-        if media_type and item["media_type"] != media_type:
-            return None
-        return _finalize_mock(item, title)
-    # fuzzy contains
-    for k, v in MOCK_CATALOG.items():
-        if k in key or key in k:
-            item = v.copy()
-            if media_type and item["media_type"] != media_type:
-                continue
-            return _finalize_mock(item, title)
-    # unknown -> fabricate a plausible stub
-    stub_id = int(hashlib.md5(key.encode()).hexdigest(), 16) % 900000 + 100000
-    return _finalize_mock({
-        "tmdb_id": stub_id,
-        "id": stub_id,
-        "media_type": media_type or "movie",
-        "title": title.title(),
-        "year": None,
-        "overview": f"An intriguing {media_type or 'title'} discovered through your feed. Details pending TMDB enrichment.",
-        "director": None,
-        "cast": [],
-        "genres": [],
-    }, title)
-
-
-async def search_and_enrich(title: str, media_type: Optional[str] = None) -> Optional[Dict]:
-    """Search TMDB for title; return normalized enriched dict. Falls back to mock."""
-    api_key = os.environ.get("TMDB_API_KEY", "").strip()
-    if not api_key:
-        return _mock_lookup(title, media_type)
-
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            search_type = "tv" if media_type == "tv" else "movie"
-            url = f"{TMDB_BASE}/search/{search_type}"
-            r = await client.get(url, params={"api_key": api_key, "query": title})
-            r.raise_for_status()
-            data = r.json()
-            results = data.get("results", [])
-            if not results:
-                return _mock_lookup(title, media_type)
-            top = results[0]
-            tmdb_id = top["id"]
-            details = await client.get(
-                f"{TMDB_BASE}/{search_type}/{tmdb_id}",
-                params={"api_key": api_key, "append_to_response": "credits"},
-            )
-            det = details.json()
-            credits = det.get("credits", {})
-            crew = credits.get("crew", [])
-            director = next((c["name"] for c in crew if c.get("job") == "Director"), None)
-            if not director and search_type == "tv":
-                creators = det.get("created_by", [])
-                director = creators[0]["name"] if creators else None
-            cast_list = [c["name"] for c in credits.get("cast", [])[:8]]
-            title_field = det.get("title") or det.get("name") or title
-            date = det.get("release_date") or det.get("first_air_date") or ""
-            year = int(date[:4]) if date and date[:4].isdigit() else None
-            runtime = det.get("runtime")
-            if runtime is None:
-                ep = det.get("episode_run_time") or []
-                runtime = ep[0] if ep else None
-            return {
-                "tmdb_id": tmdb_id,
-                "id": tmdb_id,
-                "media_type": search_type,
-                "title": title_field,
-                "year": year,
-                "overview": det.get("overview", ""),
-                "director": director,
-                "cast": cast_list,
-                "genres": [g["name"] for g in det.get("genres", [])],
-                "runtime": runtime,
-                "tmdb_rating": round(det["vote_average"], 1) if det.get("vote_average") else None,
-                "poster_url": f"{TMDB_IMG_BASE}{det['poster_path']}" if det.get("poster_path") else _poster_for(title_field),
-                "backdrop_url": f"{TMDB_IMG_BASE}{det['backdrop_path']}" if det.get("backdrop_path") else _poster_for(title_field + "-bd"),
-            }
-    except Exception:
-        return _mock_lookup(title, media_type)
+def has_key() -> bool:
+    return bool(_api_key())
 
 
 def is_mocked() -> bool:
-    return not os.environ.get("TMDB_API_KEY", "").strip()
+    # kept for backwards-compat with existing callers/meta endpoint
+    return not has_key()
+
+
+def _img(path: Optional[str], size: str) -> Optional[str]:
+    return f"{TMDB_IMG}/{size}{path}" if path else None
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _year_of(s: Optional[str]) -> Optional[int]:
+    try:
+        return int(s[:4]) if s else None
+    except (ValueError, TypeError):
+        return None
+
+
+async def _get(client: httpx.AsyncClient, path: str, **params) -> Optional[Dict]:
+    params["api_key"] = _api_key()
+    params.setdefault("language", "en-US")
+    for attempt in range(3):
+        try:
+            r = await client.get(f"{TMDB_BASE}{path}", params=params)
+            if r.status_code == 429:
+                await asyncio.sleep(1.5 * (attempt + 1))
+                continue
+            if r.status_code >= 400:
+                return None
+            return r.json()
+        except Exception:
+            return None
+    return None
+
+
+async def _search(client: httpx.AsyncClient, media_type: str, title: str, year: Optional[int]) -> List[Dict]:
+    params: Dict[str, Any] = {"query": title, "include_adult": False}
+    if year:
+        params["primary_release_year" if media_type == "movie" else "first_air_date_year"] = year
+    data = await _get(client, f"/search/{media_type}", **params)
+    return (data or {}).get("results", []) if data else []
+
+
+def _score(item: Dict, title: str, year: Optional[int], media_type: str) -> float:
+    cand_title = item.get("title") if media_type == "movie" else item.get("name")
+    cand_year = _year_of(item.get("release_date") if media_type == "movie" else item.get("first_air_date"))
+    score = 0.0
+    nt, nc = _norm(title), _norm(cand_title or "")
+    if nt and nt == nc:
+        score += 1.0
+    elif nt and (nt in nc or nc in nt):
+        score += 0.5
+    if year and cand_year == year:
+        score += 0.6
+    elif year and cand_year and abs(cand_year - year) <= 1:
+        score += 0.2
+    # popularity as a soft tiebreaker
+    score += min(item.get("popularity", 0) / 1000.0, 0.2)
+    if item.get("poster_path"):
+        score += 0.1
+    return score
+
+
+async def _best_candidate(client: httpx.AsyncClient, title: str, media_type: Optional[str], year: Optional[int]):
+    """Return (media_type, candidate_dict) or (None, None)."""
+    types = [media_type] if media_type in ("movie", "tv") else ["movie", "tv"]
+    best = (None, None, -1.0)
+    for mt in types:
+        results = await _search(client, mt, title, year)
+        if not results and year:
+            results = await _search(client, mt, title, None)  # fallback: drop year
+        for it in results[:10]:
+            s = _score(it, title, year, mt)
+            if s > best[2]:
+                best = (mt, it, s)
+    # require a minimum confidence so we don't attach a wildly wrong poster
+    if best[1] is not None and best[2] >= 0.5:
+        return best[0], best[1]
+    # last-chance: if we had a candidate but low score, still accept the top movie hit
+    if best[1] is not None and best[2] >= 0.3:
+        return best[0], best[1]
+    return None, None
+
+
+def _extract_trailer(videos: Dict) -> Optional[str]:
+    vids = (videos or {}).get("results", [])
+    # prefer official YouTube Trailer, then Teaser, then any YouTube video
+    def pick(kind, official_only):
+        for v in vids:
+            if v.get("site") == "YouTube" and v.get("type") == kind and (v.get("official") or not official_only):
+                return v.get("key")
+        return None
+    return (pick("Trailer", True) or pick("Trailer", False)
+            or pick("Teaser", True) or pick("Teaser", False)
+            or next((v.get("key") for v in vids if v.get("site") == "YouTube"), None))
+
+
+def _extract_providers(wp: Dict) -> List[Dict]:
+    """Flatten watch/providers. Prefer US, else first available region. Returns
+    a de-duplicated list of {name, logo_url, type}."""
+    results = (wp or {}).get("results", {})
+    if not results:
+        return []
+    region = results.get("US") or next(iter(results.values()), {})
+    out, seen = [], set()
+    for bucket, label in (("flatrate", "stream"), ("rent", "rent"), ("buy", "buy")):
+        for p in region.get(bucket, []) or []:
+            name = p.get("provider_name")
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            out.append({
+                "name": name,
+                "logo_url": _img(p.get("logo_path"), LOGO_SIZE),
+                "type": label,
+            })
+    return out[:12]
+
+
+async def _details(client: httpx.AsyncClient, media_type: str, tmdb_id: int) -> Optional[Dict]:
+    append = "credits,videos,watch/providers" if media_type == "movie" else "aggregate_credits,videos,watch/providers"
+    det = await _get(client, f"/{media_type}/{tmdb_id}", append_to_response=append)
+    if not det:
+        return None
+
+    credits = det.get("credits") or det.get("aggregate_credits") or {}
+    crew = credits.get("crew", [])
+    if media_type == "movie":
+        director = next((c["name"] for c in crew if c.get("job") == "Director"), None)
+        title = det.get("title")
+        year = _year_of(det.get("release_date"))
+        runtime = det.get("runtime")
+    else:
+        directors = []
+        for person in crew:
+            jobs = person.get("jobs") or []
+            if any(j.get("job") in ("Director", "Series Director") for j in jobs):
+                directors.append(person.get("name"))
+        creators = [c.get("name") for c in det.get("created_by", [])]
+        director = (directors[0] if directors else (creators[0] if creators else None))
+        title = det.get("name")
+        year = _year_of(det.get("first_air_date"))
+        ep = det.get("episode_run_time") or []
+        runtime = ep[0] if ep else None
+
+    cast = [c.get("name") for c in (credits.get("cast") or [])[:10] if c.get("name")]
+
+    return {
+        "tmdb_id": det["id"],
+        "id": det["id"],
+        "media_type": media_type,
+        "title": title,
+        "year": year,
+        "overview": det.get("overview", "") or "",
+        "director": director,
+        "cast": cast,
+        "genres": [g["name"] for g in det.get("genres", [])],
+        "runtime": runtime,
+        "tmdb_rating": round(det["vote_average"], 1) if det.get("vote_average") else None,
+        "poster_url": _img(det.get("poster_path"), POSTER_SIZE),
+        "backdrop_url": _img(det.get("backdrop_path"), BACKDROP_SIZE),
+        "trailer_key": _extract_trailer(det.get("videos")),
+        "watch_providers": _extract_providers(det.get("watch/providers")),
+    }
+
+
+async def search_and_enrich(title: str, media_type: Optional[str] = None, year: Optional[int] = None) -> Optional[Dict]:
+    """Search TMDB for title (optionally constrained by media_type/year), pick the
+    best candidate, and return fully enriched details. Returns None if no key or
+    no confident match (we never fabricate data)."""
+    if not has_key():
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            mt, cand = await _best_candidate(client, title, media_type, year)
+            if not cand:
+                return None
+            return await _details(client, mt, cand["id"])
+    except Exception:
+        return None
+
+
+async def get_details(media_type: str, tmdb_id: int) -> Optional[Dict]:
+    """Fetch full enriched details directly by TMDB id (no title search)."""
+    if not has_key() or media_type not in ("movie", "tv"):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            return await _details(client, media_type, tmdb_id)
+    except Exception:
+        return None
+
+
+async def search_candidates(title: str, media_type: Optional[str] = None, year: Optional[int] = None, limit: int = 5) -> List[Dict]:
+    """Lightweight multi-candidate search (for disambiguation UIs)."""
+    if not has_key():
+        return []
+    out = []
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            types = [media_type] if media_type in ("movie", "tv") else ["movie", "tv"]
+            scored = []
+            for mt in types:
+                results = await _search(client, mt, title, year) or await _search(client, mt, title, None)
+                for it in results[:8]:
+                    scored.append((mt, it, _score(it, title, year, mt)))
+            scored.sort(key=lambda x: x[2], reverse=True)
+            for mt, it, sc in scored[:limit]:
+                out.append({
+                    "tmdb_id": it["id"],
+                    "media_type": mt,
+                    "title": it.get("title") or it.get("name"),
+                    "year": _year_of(it.get("release_date") if mt == "movie" else it.get("first_air_date")),
+                    "poster_url": _img(it.get("poster_path"), POSTER_SIZE),
+                })
+    except Exception:
+        return out
+    return out

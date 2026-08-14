@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 3 testing of Loom (auto-save discoveries, list multi-select create + batch add, TMDB fallback, filters/sort intact). Backend: 15/15 pytest new tests pass (test_iteration_3.py) — auth register/login with @gmail.com, .test rejected (422), text discovery auto-saves confident detections (saved_count matches confident count, saved=true + entry_id, entry appears in /library WITHOUT extra save call), noise input never hallucinates + zero auto-save, url kind never 500s. Library filters (media_type/watch_status) + sorts (alpha/rating/release) + /library/genres/list all 200. Collections: POST /collections with entry_ids pre-populates (item_count=2, GET hydrates entries with title+poster), POST /collections/{id}/items/batch adds 2 (added=2), /library/{eid}/lists returns contains flag, DELETE returns 200 and subsequent GET 404. Semantic /search returns 200 with results array. All 15/15 iteration-2 regression tests continue to pass. Frontend (390x844 mobile viewport, real TMDB key INVALID): register → home OK; add-discovery text mode with 'Inception (2010) and The Dark Knight (2008)' → toast 'Saved to library: Inception, The Dark Knight' + banner 'Auto-saved 2 title(s) to your library' + both detection cards show '✓ In your library'; Lists tab → 'Create New List' opens /list/new (list-new-screen) with 2 selectable library items, entered name + selected both → submit navigated to /list/{col_id} showing detail with 'Add titles from library' button which reopens list-new-screen in add mode (no list-new-name field, correct dual-purpose behavior). TMDB enrichment fields are all null and negative fallback tmdb_ids used — as expected per user note; not flagged as a bug. Deprecated Expo API detected: ImagePicker.MediaTypeOptions.Images (removed in expo-image-picker v16+; project on 17.0.11).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "Deprecated `ImagePicker.MediaTypeOptions.Images` is used; in expo-image-picker 16+/17+ this is removed — pass `mediaTypes: ['images']` (or `'images'`) instead. Reference: /app/frontend/app/add-discovery.tsx:41"},
+      {"component": "RN-Web", "issue": "Console warnings 'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents'. Cosmetic on web preview (carried over from iter 1/2)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_3.py",
+    "/app/test_reports/pytest/pytest_iter3.xml"
+  ],
+  "action_items": [
+    "Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` (or `'images'`) in /app/frontend/app/add-discovery.tsx:41 — the enum was removed in expo-image-picker v16.",
+    "(Optional cleanup, carried over) Migrate shadow*/props.pointerEvents to style equivalents to silence RN-Web deprecation warnings.",
+    "(User-side, not a bug) Set a valid 32-hex TMDB v3 API key in backend/.env — the current placeholder (30 chars) is invalid so posters/ratings/trailers/providers remain null and library entries use negative fallback tmdb_ids."
+  ],
+  "critical_code_review_comments": [
+    "server.py ~800 lines — recommend router split (auth/discoveries/library/collections/search) before adding more endpoints.",
+    "_enrich_detections attaches the full TMDB info as `_info` on each detection then pops it before returning — clean and keeps the auto-save path off the wire. Good.",
+    "list.new dual-purpose (create/add-titles) via ?listId= param works but doubles route responsibility; if a 4th mode is ever needed, split into two components with a shared multi-select subcomponent.",
+    "add-discovery UI still has manual per-detection Save button (test-only-visible when a lower-confidence candidate is picked). That contradicts the 'no manual add' story only if a user could reach it via auto-saved detections — but they can't because auto-saved detections show 'In your library' badge instead of the button. Behavior correct, but consider hiding the button entirely to reduce surface area."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_3.py (new — 15 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 iteration-3 tests + 15/15 iteration-2 regression)",
+    "frontend": "100% of tested flows (register→home, add-discovery text auto-save banner+toast, Create New List multi-select create + list detail Add-titles-from-library add-mode)"
+  },
+  "seed_data_creation": "Per-run @gmail.com iter3_* users; library auto-populated via /discoveries auto-save. All TEST_-prefixed collections deleted at end of tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with -o 'addopts=' to disable xdist (module-scoped fixtures). Backend URL from EXPO_PUBLIC_BACKEND_URL env; prefix /api. TMDB is REAL-API-ONLY but the current TMDB_API_KEY is a 30-char placeholder (a valid v3 key is 32 hex). So enrichment fields (poster_url, backdrop_url, tmdb_rating, runtime, trailer_key, watch_providers) are all null and library entries use negative fallback tmdb_ids — this is by design; do NOT fail tests on null enrichment. AI (Gemini 3 Flash via EMERGENT_LLM_KEY) takes 5-15s per discovery. To reach /list/new, either tap testID 'lists-create-button' inside /(tabs)/lists or navigate directly. Auth flow: /(auth)/login → click 'login-goto-register' → register-screen with register-name-input/email/password/submit-button. Home tab lacks a testID on the tab bar entries — navigate via router URLs.",
+  "rca_of_issue": "N/A — no bugs found; the auto-save + multi-select flows and all backend endpoints behave per spec."
+}

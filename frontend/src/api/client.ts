@@ -79,6 +79,8 @@ export type Detection = {
   tmdb_id?: number;
   poster_url?: string;
   year?: number;
+  saved?: boolean;
+  entry_id?: string;
   alternatives?: AltCandidate[];
 };
 
@@ -92,6 +94,7 @@ export type Discovery = {
   extracted_text: string;
   ai_summary: string;
   detections: Detection[];
+  saved_count?: number;
   created_at: string;
 };
 
@@ -110,6 +113,8 @@ export type LibraryEntry = {
   backdrop_url?: string;
   runtime?: number;
   tmdb_rating?: number;
+  trailer_key?: string;
+  watch_providers?: { name: string; logo_url?: string; type: string }[];
   watch_status: 'want_to_watch' | 'watching' | 'watched';
   user_rating?: number;
   user_note: string;
