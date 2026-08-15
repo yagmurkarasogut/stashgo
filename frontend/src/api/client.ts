@@ -3,14 +3,17 @@ import { storage } from '@/src/utils/storage';
 
 const RAW_BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
 
-// Safety net for deployment: a PRODUCTION build (__DEV__ === false) must never talk
-// to the preview backend. If the preview URL leaked into the production bundle
-// (preview→prod env rewrite didn't apply), derive the production host from it.
-// We only rewrite in non-dev builds, so the preview/dev experience is untouched.
-// The production host is DERIVED from the preview URL — no hardcoded URL.
-const BASE =
-  !__DEV__ && RAW_BASE.includes('.preview.emergentagent.com')
-    ? RAW_BASE.replace('.preview.emergentagent.com', '.emergent.host')
+// Known production backend host (used only as a safety net in production builds).
+const PROD_BACKEND = 'https://media-vault-api.emergent.host';
+
+// A PRODUCTION build (APK/OTA, __DEV__ === false) must always reach the live
+// backend. If the injected value is empty OR still points at the preview host
+// (env-rewrite didn't apply in the build), fall back to the known prod host.
+// In DEV/preview we always honour the injected preview URL, so preview is untouched.
+const BASE = __DEV__
+  ? RAW_BASE
+  : (!RAW_BASE || RAW_BASE.includes('.preview.emergentagent.com'))
+    ? PROD_BACKEND
     : RAW_BASE;
 
 let inMemoryToken: string | null = null;

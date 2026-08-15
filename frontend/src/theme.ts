@@ -30,7 +30,7 @@ export const fonts = {
 };
 
 export const IMAGES = {
-  authHero: 'https://images.pexels.com/photos/19830143/pexels-photo-19830143.jpeg',
+  authHero: 'https://customer-assets-4nw71qhi.emergentagent.net/job_media-vault-api/artifacts/bwc0m2oz_file_000000001b8c81f48e48aa8052c2a519.png',
   emptyTheater: 'https://images.unsplash.com/photo-1761344580244-767bc4e2e8c8?w=800',
   posterFallback: 'https://images.unsplash.com/photo-1782899937486-e0eee1d0065c?w=500',
 };

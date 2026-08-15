@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.mediavaultapi.fcqxk1"
+      "bundleIdentifier": "com.emergent.mediavaultapi.fcqxk1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Analyze screenshots to find movies and shows."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.mediavaultapi.fcqxk1"
+      "package": "com.emergent.mediavaultapi.fcqxk1",
+      "permissions": ["INTERNET", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Analyze screenshots to find movies and shows."
+        }
+      ],
       [
         "expo-splash-screen",
         {

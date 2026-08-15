@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 8 — regression check for the two-part deploy fix: (1) /app/frontend/src/api/client.ts now hard-codes PROD_BACKEND='https://media-vault-api.emergent.host' as a safety-net when __DEV__===false AND (RAW_BASE empty || contains '.preview.emergentagent.com'); in preview __DEV__===true so BASE = RAW_BASE = https://media-vault-api.preview.emergentagent.com unchanged. (2) Auth hero background switched to the new cinema-themed URL in /app/frontend/src/theme.ts (customer-assets-4nw71qhi.emergentagent.net/…/bwc0m2oz_file_000000001b8c81f48e48aa8052c2a519.png). Also confirmed app.json android.permissions=['INTERNET','READ_MEDIA_IMAGES']. Both changes ship non-regressive in preview. Backend 12/12 pytest pass. Frontend flows (390×844) all pass: (a) new user register iter8b_1786834338@gmail.com via register-email-input/register-password-input/register-submit-button → home-screen. (b) Onboarding still reachable — first tap of login-goto-register goes to onboarding-screen; onboarding-skip → register-screen. (c) profile-logout-button → login-screen. (d) Wrong password → login-error shows exactly 'Invalid credentials' (non-blank). (e) Correct login → home-screen. (f) home-add-fab → add-discovery-screen; add-mode-text + add-text-input 'Interstellar (2014)' + add-submit-button → add-saved-banner 'Auto-saved 1 title(s) to your library' with real TMDB Interstellar poster rendered inline. (g) New hero image verified complete on both login-screen and register-screen (natural 853×1844, complete=true, no broken image / no crash). Zero page errors, zero red screens. Only console noise: expected pre-auth 401 on /home ('Missing bearer token') and RN-Web cosmetic warnings (shadow*, pointerEvents) — all carry-over.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "Deprecated `ImagePicker.MediaTypeOptions.Images` still used. Reference: /app/frontend/app/add-discovery.tsx:41 (carry-over from iter3–iter7). Replace with `mediaTypes: ['images']`."},
+      {"component": "RN-Web (Animated)", "issue": "'Animated: useNativeDriver is not supported…' warning on add-saved-banner animation — web-only cosmetic."},
+      {"component": "RN-Web", "issue": "'shadow* style props are deprecated. Use boxShadow' and 'props.pointerEvents is deprecated. Use style.pointerEvents' warnings — cosmetic on web preview only."},
+      {"component": "react-navigation tabBarTestID", "issue": "tabBarTestID='tab-profile'/'tab-library'/'tab-home' declared in /app/frontend/app/(tabs)/_layout.tsx do NOT render as data-testid on RN-Web — tests must fall back to text selectors ('Home'/'Library'/'Profile'). Non-blocking."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_8.json", "/app/backend/tests/test_iteration_7.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": [
+    "None blocking — client.ts + theme.ts + app.json changes are safe to ship.",
+    "(Carry-over) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41.",
+    "(Reminder) The production BASE-fallback branch (client.ts lines 13–17) CANNOT be exercised in preview because __DEV__===true. To verify the prod path, build with `expo export` (or a real prod APK) and confirm: (a) if EXPO_PUBLIC_BACKEND_URL is empty OR still contains '.preview.emergentagent.com' → BASE === 'https://media-vault-api.emergent.host'; (b) if EXPO_PUBLIC_BACKEND_URL is a distinct prod host → BASE === that host unchanged.",
+    "(Minor code-review nit) The hard-coded string 'https://media-vault-api.emergent.host' is now inlined in client.ts. Acceptable as a documented safety net, but consider driving it from a build-time env instead (e.g. EXPO_PUBLIC_PROD_BACKEND_URL) to avoid touching source when the prod host ever changes."
+  ],
+  "critical_code_review_comments": [
+    "client.ts BASE derivation is correct and preview-safe: __DEV__ short-circuit means preview always uses RAW_BASE. The two-condition fallback (empty || preview substring) covers both the 'env not injected' and 'env forgot to rewrite' failure modes for a prod build.",
+    "The new PROD_BACKEND constant is a hard-coded host — acceptable given deployment realities, but see action_items for a follow-up to source it from env.",
+    "theme.ts IMAGES.authHero is loaded via <Image source={{uri: IMAGES.authHero}}> on both login and register screens; the new URL responds 200 and image loads (naturalWidth=853, naturalHeight=1844, complete=true).",
+    "app.json android.permissions now includes 'INTERNET' — required for release builds on Android; correct placement inside expo.android.permissions."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (12/12 in test_iteration_7.py)", "frontend": "100% (7/7 requested flows in preview)"},
+  "seed_data_creation": "Test users registered in preview: iter8b_1786834338@gmail.com (password 'secret123', 1 auto-saved library entry: Interstellar 2014) plus per-test uuid users from pytest run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 8 confirms iter6/iter7 flows continue to pass after (a) tightening the client.ts prod-fallback to a hard-coded host and (b) swapping IMAGES.authHero. To manually re-run: `EXPO_PUBLIC_BACKEND_URL=https://media-vault-api.preview.emergentagent.com pytest /app/backend/tests/test_iteration_7.py -v`. Frontend playwright selectors unchanged from iter6. NOTE: first-time login-goto-register lands on onboarding-screen — must click onboarding-skip (or step through onboarding-next 5 times) to reach register-screen. tabBarTestID does not surface as data-testid on RN-Web — use `page.get_by_text('Library'|'Profile'|'Home', exact=True).first` for tab taps.",
+  "rca_of_issue": "N/A — no regression. In preview __DEV__===true, so the ternary `__DEV__ ? RAW_BASE : (!RAW_BASE || RAW_BASE.includes('.preview.emergentagent.com')) ? PROD_BACKEND : RAW_BASE` collapses to `BASE = RAW_BASE`, keeping every request pointed at https://media-vault-api.preview.emergentagent.com/api… exactly as iter6/iter7. The new hero image URL responds 200 and renders on both auth screens without a broken-image icon or crash."
+}
