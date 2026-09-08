@@ -136,3 +136,22 @@ Testing: iteration_9 = 18/18 backend pytest + full frontend PASS. Retest false.
 - App Store / Google Play config audit (app.json identifiers/version/build/permissions).
 - Deterministic build-time production API URL (vs current client.ts runtime safety-net).
 
+
+### Follow-up: VPN RCA + Store Audit + Login Language (COMPLETE)
+Checkpoint before work: git 39490a8.
+- **Login Language switch**: compact TR|EN pill top-right of login screen (app/(auth)/login.tsx),
+  uses useI18n setLang, persisted. Verified: whole login screen switches TR/EN instantly.
+- **Store Audit (app.json)**: added ios.buildNumber="1", android.versionCode=1,
+  ios ITSAppUsesNonExemptEncryption=false (skips App Store export-compliance prompt).
+  Kept scheme="frontend" (Google OAuth derives redirect from scheme via Linking.createURL —
+  changing it risks OAuth regression on rebuild; not a store blocker). Permissions already minimal
+  (INTERNET, READ_MEDIA_IMAGES) with usage strings. bundleId/package unchanged.
+- **Legal**: company-specific fields now explicit [PLACEHOLDER] markers (provider/contact/effective
+  date) per user — not invented. Structure ready for real details later.
+- **VPN RCA (deployer, authoritative)**: production origin HEALTHY, 2 fixed replicas (no sleep),
+  no geo/WAF/IP-allowlist/bot-challenge. Top hypothesis = broken/half-open IPv6 on the affected
+  carrier; VPN masks it via IPv4. NOT a source bug — no RN-side fix to force IPv4 in fetch.
+  Action for user: on failing device test cellular vs wifi / disable IPv6 to confirm; platform to
+  confirm AAAA/IPv6 origin reachability. App already resolves prod host deterministically in non-dev
+  builds (client.ts safety-net), so production never actually uses the baked preview URL.
+

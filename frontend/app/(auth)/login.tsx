@@ -5,14 +5,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/context/AuthContext';
-import { useT } from '@/src/i18n';
+import { useI18n } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
-  const t = useT();
+  const insets = useSafeAreaInsets();
+  const { lang, setLang, t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<null | 'email' | 'google'>(null);
@@ -41,6 +43,22 @@ export default function Login() {
         style={StyleSheet.absoluteFillObject}
         locations={[0, 0.5, 1]}
       />
+      <View style={[styles.langSwitch, { top: insets.top + spacing.sm }]} testID="login-language-switch">
+        {(['tr', 'en'] as const).map((l) => {
+          const active = lang === l;
+          return (
+            <Pressable
+              key={l}
+              testID={`login-lang-${l}`}
+              onPress={() => setLang(l)}
+              style={[styles.langPill, active && styles.langPillActive]}
+              hitSlop={8}
+            >
+              <Text style={[styles.langPillText, active && styles.langPillTextActive]}>{l === 'tr' ? 'TR' : 'EN'}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
@@ -153,4 +171,19 @@ const styles = StyleSheet.create({
   footerLink: { color: colors.brand, fontSize: 13, fontWeight: '600' },
   forgotRow: { alignItems: 'center', marginTop: spacing.md },
   forgotText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: '600' },
+  langSwitch: {
+    position: 'absolute',
+    right: spacing.lg,
+    zIndex: 10,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    padding: 2,
+  },
+  langPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, minWidth: 40, alignItems: 'center' },
+  langPillActive: { backgroundColor: colors.brand },
+  langPillText: { color: colors.onSurfaceSecondary, fontSize: 12, fontWeight: '700' },
+  langPillTextActive: { color: colors.onBrand },
 });

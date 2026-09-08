@@ -20,7 +20,8 @@ const CONTENT: Record<'terms' | 'privacy', Record<'en' | 'tr', { title: string; 
         '4. AI analysis — Titles are detected using automated AI and may occasionally be inaccurate. Results are provided on a best-effort basis.',
         '5. Availability — The service is provided "as is" without warranties. We may update or discontinue features.',
         '6. Changes — We may update these terms; continued use means you accept the changes.',
-        'This document is a plain-language summary and is not legal advice.',
+        '7. Provider & contact — [PLACEHOLDER: legal company/owner name, address and contact email to be provided].',
+        'Effective date: [PLACEHOLDER]. This document is a plain-language summary and is not legal advice.',
       ],
     },
     tr: {

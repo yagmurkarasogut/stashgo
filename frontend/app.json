@@ -11,8 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.mediavaultapi.fcqxk1",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Analyze screenshots to find movies and shows."
+        "NSPhotoLibraryUsageDescription": "Analyze screenshots to find movies and shows.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -22,6 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.mediavaultapi.fcqxk1",
+      "versionCode": 1,
       "permissions": [
         "INTERNET",
         "READ_MEDIA_IMAGES"
