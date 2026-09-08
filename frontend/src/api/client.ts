@@ -1,5 +1,6 @@
 // Minimal API client for Trace
 import { storage } from '@/src/utils/storage';
+import { isPremium } from '@/src/lib/entitlement';
 
 const RAW_BASE = (process.env.EXPO_PUBLIC_BACKEND_URL || '').replace(/\/+$/, '');
 
@@ -46,6 +47,7 @@ async function request<T>(path: string, opts: RequestInit = {}, auth = true): Pr
   if (auth) {
     const t = await getToken();
     if (t) headers['Authorization'] = `Bearer ${t}`;
+    headers['X-Premium'] = isPremium() ? '1' : '0';
   }
 
   let res: Response;

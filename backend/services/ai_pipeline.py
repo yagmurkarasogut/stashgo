@@ -332,6 +332,61 @@ def _normalize(parsed: Dict, fallback_text: str = "") -> Dict:
     }
 
 
+DISCOVER_SYSTEM = """You are Stash Go's AI movie & TV discovery assistant. The user describes what they want in natural language. Their request is either:
+(A) IDENTIFY — a vague memory, scene, plot detail, actor, visual clue or description, and they want you to NAME the specific movie/series they mean.
+(B) RECOMMEND — a request by mood, runtime, genre, streaming platform, similarity ("like X but ..."), or occasion ("tonight", "90 minutes").
+
+Use your BROAD GENERAL knowledge of real movies and TV shows from around the world. You are NOT limited to any saved library — reason freely over everything you know.
+
+RULES:
+1. Only ever return REAL, existing movies or TV shows. NEVER invent a title.
+2. If IDENTIFYING and you are unsure, return the 1-3 most likely real candidates (best first).
+3. If RECOMMENDING, return 4-8 strong, varied real suggestions that genuinely fit the request.
+4. Do NOT translate the movie/series TITLE. Always give the title as officially/widely known (original or common English title) so it can be matched against a metadata provider.
+5. Only the "message" and each "reason" should be written in the SAME LANGUAGE as the user's request.
+
+Return STRICT JSON only, no markdown, schema:
+{
+  "intent": "identify" | "recommend",
+  "message": "one short friendly sentence in the user's language",
+  "results": [
+    {"title": "string", "media_type": "movie" | "tv", "year": null, "reason": "short reason in the user's language"}
+  ]
+}"""
+
+
+async def discover_from_clue(query: str) -> Dict:
+    """Identify or recommend movies/TV from a free-text clue using GENERAL knowledge
+    (not limited to the user's library). Returns {intent, message, results:[{title,media_type,year,reason}]}."""
+    key = os.environ.get("EMERGENT_LLM_KEY", "")
+    if not key:
+        raise RuntimeError("EMERGENT_LLM_KEY not configured")
+    chat = LlmChat(
+        api_key=key,
+        session_id=f"discover-{uuid.uuid4().hex[:8]}",
+        system_message=DISCOVER_SYSTEM,
+    ).with_model("gemini", "gemini-3-flash-preview")
+    reply = await chat.send_message(UserMessage(text=f"USER REQUEST:\n{query[:1500]}"))
+    parsed = _extract_json(reply) or {}
+    intent = parsed.get("intent") if parsed.get("intent") in ("identify", "recommend") else "recommend"
+    results = []
+    seen = set()
+    for r in (parsed.get("results") or []):
+        title = (r.get("title") or "").strip()
+        if not title or title.lower() in seen:
+            continue
+        seen.add(title.lower())
+        results.append({
+            "title": title,
+            "media_type": r.get("media_type") if r.get("media_type") in ("movie", "tv") else "movie",
+            "year": r.get("year") if isinstance(r.get("year"), int) else None,
+            "reason": (r.get("reason") or "")[:300],
+        })
+        if len(results) >= 8:
+            break
+    return {"intent": intent, "message": (parsed.get("message") or "")[:300], "results": results}
+
+
 async def semantic_search_library(query: str, library_items: List[Dict]) -> List[Dict]:
     """Ask Gemini to rank library items against a natural-language query.
     Returns list of {tmdb_id, media_type, reason, score}.

@@ -69,6 +69,32 @@ export default function Home() {
           </View>
         </View>
 
+        {/* AI conversation entry */}
+        <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
+          <Pressable testID="home-ai-entry" onPress={() => router.push('/ai-discover')} style={styles.aiCard}>
+            <View style={styles.aiIcon}>
+              <Ionicons name="sparkles" size={18} color={colors.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.aiTitle}>{t('home.aiTitle')}</Text>
+              <Text style={styles.aiPrompt} numberOfLines={1}>{t('home.aiPrompt')}</Text>
+            </View>
+            <Ionicons name="arrow-forward" size={18} color={colors.onSurfaceTertiary} />
+          </Pressable>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.aiChipRow}>
+            {['discover.c1', 'discover.c3', 'discover.c4', 'discover.c5'].map((k) => (
+              <Pressable
+                key={k}
+                testID={`home-ai-chip-${k}`}
+                onPress={() => router.push({ pathname: '/ai-discover', params: { q: t(k) } })}
+                style={styles.aiChip}
+              >
+                <Text style={styles.aiChipText}>{t(k)}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Hero recent library carousel */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
@@ -207,6 +233,13 @@ const styles = StyleSheet.create({
   statNum: { color: colors.brand, fontSize: 18, fontWeight: '700' },
   statLabel: { color: colors.onSurfaceTertiary, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
   section: { marginBottom: spacing.xl },
+  aiCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.brand, padding: spacing.md },
+  aiIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceTertiary, alignItems: 'center', justifyContent: 'center' },
+  aiTitle: { color: colors.onSurface, fontSize: 15, fontWeight: '700' },
+  aiPrompt: { color: colors.onSurfaceTertiary, fontSize: 13, marginTop: 2 },
+  aiChipRow: { gap: spacing.sm, paddingVertical: spacing.md },
+  aiChip: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  aiChipText: { color: colors.onSurface, fontSize: 13, fontWeight: '600' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   sectionTitle: { color: colors.onSurface, fontSize: 18, fontWeight: '600' },
   link: { color: colors.brand, fontSize: 13, fontWeight: '600' },

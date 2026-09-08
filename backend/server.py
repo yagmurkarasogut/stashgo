@@ -15,7 +15,7 @@ from typing import List, Optional, Dict, Any, Literal
 import bcrypt
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -526,9 +526,55 @@ async def _upsert_library_entry(user_id: str, info: Dict, discovery_id: Optional
 # minimum confidence for a detection to be auto-saved to the library
 AUTO_SAVE_THRESHOLD = 0.5
 
+# Free tier: 5 AI analyses per calendar day. Premium (verified store entitlement,
+# reported by the client from RevenueCat) is unlimited. Entitlement source of truth is
+# the RevenueCat SDK on the client; backend only counts usage for the free cap.
+FREE_AI_DAILY_LIMIT = 5
+
+
+def _is_premium_request(request: Request) -> bool:
+    return request.headers.get("x-premium", "").lower() in ("1", "true", "yes")
+
+
+async def _ai_usage_today(user_id: str) -> int:
+    day = now_utc().strftime("%Y-%m-%d")
+    doc = await db.ai_usage.find_one({"user_id": user_id, "day": day})
+    return doc["count"] if doc else 0
+
+
+async def _check_ai_quota(user: Dict, request: Request) -> None:
+    if _is_premium_request(request):
+        return
+    day = now_utc().strftime("%Y-%m-%d")
+    used = await _ai_usage_today(user["user_id"])
+    if used >= FREE_AI_DAILY_LIMIT:
+        raise HTTPException(
+            status_code=402,
+            detail="You've reached today's free limit of 5 AI analyses. Upgrade to Stash Go Premium for unlimited.",
+        )
+    await db.ai_usage.update_one(
+        {"user_id": user["user_id"], "day": day},
+        {"$inc": {"count": 1}, "$setOnInsert": {"created_at": now_utc()}},
+        upsert=True,
+    )
+
+
+@api.get("/ai/usage")
+async def ai_usage(request: Request, user=Depends(get_current_user)):
+    premium = _is_premium_request(request)
+    used = await _ai_usage_today(user["user_id"])
+    return {
+        "premium": premium,
+        "limit": FREE_AI_DAILY_LIMIT,
+        "used": used,
+        "remaining": max(0, FREE_AI_DAILY_LIMIT - used),
+        "unlimited": premium,
+    }
+
 
 @api.post("/discoveries", response_model=Discovery)
-async def create_discovery(body: DiscoveryCreate, user=Depends(get_current_user)):
+async def create_discovery(body: DiscoveryCreate, request: Request, user=Depends(get_current_user)):
+    await _check_ai_quota(user, request)
     if body.kind == "url":
         if not body.url:
             raise HTTPException(status_code=400, detail="url required")
@@ -872,6 +918,52 @@ async def semantic_search(body: SearchQuery, user=Depends(get_current_user)):
                 hydrated.append(hit)
         hydrated = hydrated[:12]
     return {"query": body.query, "results": hydrated}
+
+
+class AiDiscoverBody(BaseModel):
+    query: str
+
+
+@api.post("/ai/discover")
+async def ai_discover(body: AiDiscoverBody, request: Request, user=Depends(get_current_user)):
+    """Conversational discovery: identify or recommend movies/TV from a free-text clue,
+    using general AI knowledge (NOT limited to the user's library). Enriches each result
+    via TMDB and marks which are already saved. Results are NOT auto-saved."""
+    q = (body.query or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="Ask something first")
+    await _check_ai_quota(user, request)
+    try:
+        out = await ai_pipeline.discover_from_clue(q)
+    except Exception:
+        logger.exception("ai_discover failed")
+        raise HTTPException(status_code=502, detail="AI is unavailable right now")
+
+    # which tmdb ids the user already has
+    owned = await db.library.find(
+        {"user_id": user["user_id"]}, {"_id": 0, "tmdb_id": 1, "media_type": 1, "entry_id": 1}
+    ).to_list(length=1000)
+    owned_map = {(o["tmdb_id"], o["media_type"]): o["entry_id"] for o in owned}
+
+    cards = []
+    for r in out.get("results", []):
+        info = await tmdb_svc.search_and_enrich(r["title"], r.get("media_type"), r.get("year"))
+        if not info:
+            continue  # only surface results we can back with real metadata
+        key = (info["tmdb_id"], info["media_type"])
+        cards.append({
+            "tmdb_id": info["tmdb_id"],
+            "media_type": info["media_type"],
+            "title": info["title"],
+            "year": info.get("year"),
+            "poster_url": info.get("poster_url"),
+            "overview": (info.get("overview") or "")[:300],
+            "tmdb_rating": info.get("tmdb_rating"),
+            "reason": r.get("reason", ""),
+            "saved": key in owned_map,
+            "entry_id": owned_map.get(key),
+        })
+    return {"intent": out.get("intent", "recommend"), "message": out.get("message", ""), "results": cards}
 
 
 # ---------- META ----------

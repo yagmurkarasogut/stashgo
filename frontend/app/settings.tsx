@@ -7,6 +7,7 @@ import { api } from '@/src/api/client';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
 import { useI18n } from '@/src/i18n';
+import { useSubscription } from '@/src/lib/revenuecat';
 import { colors, spacing, radius } from '@/src/theme';
 
 export default function Settings() {
@@ -15,6 +16,7 @@ export default function Settings() {
   const { user, logout } = useAuth();
   const toast = useToast();
   const { lang, setLang, t } = useI18n();
+  const { isSubscribed } = useSubscription();
 
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
@@ -63,6 +65,16 @@ export default function Settings() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40, gap: spacing.lg }}>
+        {/* Premium */}
+        <Pressable testID="settings-premium" onPress={() => router.push('/paywall')} style={[styles.card, { borderColor: colors.brand, flexDirection: 'row', alignItems: 'center', gap: spacing.md }]}>
+          <Ionicons name={isSubscribed ? 'sparkles' : 'star-outline'} size={20} color={colors.brand} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.label, { marginBottom: 2 }]}>{t('premium.manage')}</Text>
+            <Text style={styles.premiumSub}>{isSubscribed ? t('premium.active') : t('premium.freeNote')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.onSurfaceTertiary} />
+        </Pressable>
+
         {/* Language */}
         <View style={styles.card}>
           <Text style={styles.label}>{t('settings.language')}</Text>
@@ -145,6 +157,7 @@ const styles = StyleSheet.create({
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm },
   linkText: { color: colors.onSurface, fontSize: 14 },
   dangerHint: { color: colors.onSurfaceTertiary, fontSize: 12, lineHeight: 17 },
+  premiumSub: { color: colors.onSurfaceTertiary, fontSize: 12 },
   dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.error, borderRadius: radius.sm, paddingVertical: 12, marginTop: spacing.xs },
   dangerText: { color: colors.error, fontWeight: '700', fontSize: 13 },
   dangerConfirm: { color: colors.onSurface, fontSize: 13, fontWeight: '600' },

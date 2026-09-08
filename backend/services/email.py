@@ -90,7 +90,7 @@ def _assert_safe_email(subject: str, html: str) -> None:
 
 def _cfg():
     key = os.environ.get("EMERGENT_EMAIL_KEY")
-    from_name = os.environ.get("EMAIL_FROM_NAME", "Trace")
+    from_name = os.environ.get("EMAIL_FROM_NAME", "Stash Go")
     return key, from_name
 
 
@@ -128,35 +128,35 @@ async def send_email(*, to: str, subject: str, html: str) -> str | None:
 
 def reset_code_email(name: str, code: str, lang: str) -> tuple[str, str]:
     """Returns (subject, html) for the password reset code email. Fixed server-side
-    template; the code is entered in the Trace app, never replied to this email."""
+    template; the code is entered in the Stash Go app, never replied to this email."""
     safe_name = escape(name or "")
     if lang == "tr":
-        subject = "Trace şifre sıfırlama kodunuz"
+        subject = "Stash Go şifre sıfırlama kodunuz"
         html = (
             '<table role="presentation" width="100%"><tr><td style="padding:24px;'
             'font-family:Arial,sans-serif;color:#111">'
             f'<p>Merhaba {safe_name},</p>'
-            '<p>Trace hesabınızın şifresini sıfırlamak için doğrulama kodunuz:</p>'
+            '<p>Stash Go hesabınızın şifresini sıfırlamak için doğrulama kodunuz:</p>'
             f'<p style="font-size:28px;font-weight:bold;letter-spacing:4px">{escape(code)}</p>'
-            '<p>Bu kodu Trace uygulamasına girerek yeni şifrenizi belirleyebilirsiniz. '
+            '<p>Bu kodu Stash Go uygulamasına girerek yeni şifrenizi belirleyebilirsiniz. '
             'Kod 15 dakika içinde geçerliliğini yitirir.</p>'
             '<p>Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>'
-            '<p style="font-size:12px;color:#888">Trace tarafından gönderildi. '
+            '<p style="font-size:12px;color:#888">Stash Go tarafından gönderildi. '
             'Şifrenizi veya kart bilgilerinizi asla e-posta ile istemeyiz.</p>'
             '</td></tr></table>'
         )
     else:
-        subject = "Your Trace password reset code"
+        subject = "Your Stash Go password reset code"
         html = (
             '<table role="presentation" width="100%"><tr><td style="padding:24px;'
             'font-family:Arial,sans-serif;color:#111">'
             f'<p>Hi {safe_name},</p>'
-            '<p>Your verification code to reset your Trace password is:</p>'
+            '<p>Your verification code to reset your Stash Go password is:</p>'
             f'<p style="font-size:28px;font-weight:bold;letter-spacing:4px">{escape(code)}</p>'
-            '<p>Enter this code in the Trace app to set a new password. '
+            '<p>Enter this code in the Stash Go app to set a new password. '
             'The code expires in 15 minutes.</p>'
             '<p>If you did not request this, you can safely ignore this email.</p>'
-            '<p style="font-size:12px;color:#888">Sent by Trace. We never ask for your '
+            '<p style="font-size:12px;color:#888">Sent by Stash Go. We never ask for your '
             'password or card details by email.</p>'
             '</td></tr></table>'
         )

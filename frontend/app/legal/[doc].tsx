@@ -13,10 +13,10 @@ const CONTENT: Record<'terms' | 'privacy', Record<'en' | 'tr', { title: string; 
     en: {
       title: 'Terms of Service',
       body: [
-        'Welcome to Trace. By creating an account and using the app you agree to these terms.',
+        'Welcome to Stash Go. By creating an account and using the app you agree to these terms.',
         '1. Your account — You are responsible for keeping your login credentials secure. You may delete your account at any time from Settings.',
-        '2. Acceptable use — Trace helps you identify and organize movies and TV shows you discover. Do not use the app for unlawful purposes or to upload content you do not have the right to share.',
-        '3. Content — Movie and TV metadata is provided by TMDB. Trace is not endorsed or certified by TMDB.',
+        '2. Acceptable use — Stash Go helps you identify and organize movies and TV shows you discover. Do not use the app for unlawful purposes or to upload content you do not have the right to share.',
+        '3. Content — Movie and TV metadata is provided by TMDB. Stash Go is not endorsed or certified by TMDB.',
         '4. AI analysis — Titles are detected using automated AI and may occasionally be inaccurate. Results are provided on a best-effort basis.',
         '5. Availability — The service is provided "as is" without warranties. We may update or discontinue features.',
         '6. Changes — We may update these terms; continued use means you accept the changes.',
@@ -27,10 +27,10 @@ const CONTENT: Record<'terms' | 'privacy', Record<'en' | 'tr', { title: string; 
     tr: {
       title: 'Kullanım Koşulları',
       body: [
-        "Trace'e hoş geldiniz. Bir hesap oluşturup uygulamayı kullanarak bu koşulları kabul etmiş olursunuz.",
+        "Stash Go'ya hoş geldiniz. Bir hesap oluşturup uygulamayı kullanarak bu koşulları kabul etmiş olursunuz.",
         '1. Hesabınız — Giriş bilgilerinizi güvende tutmaktan siz sorumlusunuz. Hesabınızı istediğiniz zaman Ayarlar bölümünden silebilirsiniz.',
-        '2. Kabul edilebilir kullanım — Trace, karşılaştığınız film ve dizileri tanımlamanıza ve düzenlemenize yardımcı olur. Uygulamayı yasa dışı amaçlarla veya paylaşma hakkına sahip olmadığınız içerikleri yüklemek için kullanmayın.',
-        '3. İçerik — Film ve dizi meta verileri TMDB tarafından sağlanır. Trace, TMDB tarafından onaylanmış veya sertifikalandırılmış değildir.',
+        '2. Kabul edilebilir kullanım — Stash Go, karşılaştığınız film ve dizileri tanımlamanıza ve düzenlemenize yardımcı olur. Uygulamayı yasa dışı amaçlarla veya paylaşma hakkına sahip olmadığınız içerikleri yüklemek için kullanmayın.',
+        '3. İçerik — Film ve dizi meta verileri TMDB tarafından sağlanır. Stash Go, TMDB tarafından onaylanmış veya sertifikalandırılmış değildir.',
         '4. Yapay zekâ analizi — Başlıklar otomatik yapay zekâ ile tespit edilir ve zaman zaman hatalı olabilir. Sonuçlar en iyi çaba esasına göre sunulur.',
         '5. Erişilebilirlik — Hizmet, herhangi bir garanti olmaksızın "olduğu gibi" sunulur. Özellikleri güncelleyebilir veya durdurabiliriz.',
         '6. Değişiklikler — Bu koşulları güncelleyebiliriz; kullanmaya devam etmeniz değişiklikleri kabul ettiğiniz anlamına gelir.',
@@ -42,11 +42,11 @@ const CONTENT: Record<'terms' | 'privacy', Record<'en' | 'tr', { title: string; 
     en: {
       title: 'Privacy Policy & KVKK',
       body: [
-        'This policy explains what data Trace processes and why.',
+        'This policy explains what data Stash Go processes and why.',
         '1. Data we store — Your email, an optional display name, and the movies/shows, lists and notes you save. Passwords are stored only as a secure one-way hash.',
         '2. How we use it — To provide the core features: authentication, your personal library, lists and semantic search.',
         '3. Third parties — Movie metadata comes from TMDB. AI analysis of the content you submit is processed by our AI provider. Emails (such as password reset codes) are delivered by our email provider.',
-        '4. Account & data deletion — Deleting your account permanently removes your library, lists and personal data from Trace. This action cannot be undone.',
+        '4. Account & data deletion — Deleting your account permanently removes your library, lists and personal data from Stash Go. This action cannot be undone.',
         '5. Your rights (KVKK/GDPR) — You may access, correct or delete your personal data. Account deletion in Settings fulfills your right to erasure.',
         '6. Contact — For privacy requests, contact the app owner through the store listing.',
         'This document is a plain-language summary and is not legal advice.',
@@ -55,11 +55,11 @@ const CONTENT: Record<'terms' | 'privacy', Record<'en' | 'tr', { title: string; 
     tr: {
       title: 'Gizlilik Politikası ve KVKK',
       body: [
-        "Bu politika, Trace'in hangi verileri neden işlediğini açıklar.",
+        "Bu politika, Stash Go'nun hangi verileri neden işlediğini açıklar.",
         '1. Sakladığımız veriler — E-posta adresiniz, isteğe bağlı görünen adınız ve kaydettiğiniz film/diziler, listeler ve notlar. Şifreler yalnızca güvenli, geri döndürülemez bir özet (hash) olarak saklanır.',
         '2. Verileri nasıl kullanırız — Temel özellikleri sağlamak için: kimlik doğrulama, kişisel kütüphaneniz, listeleriniz ve akıllı arama.',
         '3. Üçüncü taraflar — Film meta verileri TMDB tarafından sağlanır. Gönderdiğiniz içeriğin yapay zekâ analizi, yapay zekâ sağlayıcımız tarafından işlenir. E-postalar (örneğin şifre sıfırlama kodları) e-posta sağlayıcımız tarafından iletilir.',
-        '4. Hesap ve veri silme — Hesabınızı silmek, kütüphanenizi, listelerinizi ve kişisel verilerinizi Trace üzerinden kalıcı olarak kaldırır. Bu işlem geri alınamaz.',
+        '4. Hesap ve veri silme — Hesabınızı silmek, kütüphanenizi, listelerinizi ve kişisel verilerinizi Stash Go üzerinden kalıcı olarak kaldırır. Bu işlem geri alınamaz.',
         '5. Haklarınız (KVKK/GDPR) — Kişisel verilerinize erişebilir, bunları düzeltebilir veya silebilirsiniz. Ayarlar bölümündeki hesap silme, silinme (unutulma) hakkınızı yerine getirir.',
         '6. İletişim — Gizlilikle ilgili talepleriniz için uygulama sahibine mağaza sayfası üzerinden ulaşabilirsiniz.',
         'Bu belge sade dille hazırlanmış bir özettir ve hukuki tavsiye niteliği taşımaz.',

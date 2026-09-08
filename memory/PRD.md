@@ -155,3 +155,28 @@ Checkpoint before work: git 39490a8.
   confirm AAAA/IPv6 origin reachability. App already resolves prod host deterministically in non-dev
   builds (client.ts safety-net), so production never actually uses the baked preview URL.
 
+
+### Rebrand Trace->Stash Go + AI-from-Home + AI beyond Library (iteration_10) + Subscriptions
+Checkpoint before payments: git 77f53c5.
+- BRAND: user-facing "Trace"->"Stash Go" in i18n (en+tr), legal, email templates, app.json name,
+  EMAIL_FROM_NAME. Auth wordmarks replaced with logo image (assets/images/logo.png) on login/
+  register/onboarding. Technical ids/hostnames/scheme/bundleId unchanged.
+- TR fix: removed "Vault/Kasa/Kasanız" -> "Library/Kütüphane(niz)"; titles never translated (data).
+- AI from Home: app/ai-discover.tsx (conversational) + Home "Ask Stash Go" entry+chips.
+- AI beyond library: backend POST /api/ai/discover (ai_pipeline.discover_from_clue, Gemini general
+  knowledge, TMDB-enriched, NOT library-bound, not auto-saved; save via POST /library). Tested identify+recommend.
+- iteration_10 testing PASS (backend 14/14, frontend ~95%); the only miss (auth wordmarks) fixed after.
+
+### Subscriptions — Stash Go Premium (Emergent-managed RevenueCat)
+- RevenueCat connected + provisioned: entitlement `pro`, offering `default`, $rc_monthly=prod682fc458bf.
+  Price set to USD 2.99 + TRY 149.99 / month. Keys in frontend/.env. Details in /app/memory/revenuecat.md.
+- Frontend: src/lib/revenuecat.tsx (per playbook), _layout QueryClient+SubscriptionProvider+logIn/out,
+  app/paywall.tsx (coded paywall, monthly, restore, entitlement gate, unavailable fallback), Settings
+  premium row, entitlement bridge src/lib/entitlement.ts.
+- AI limit: FREE=5 analyses/calendar day (backend ai_usage counter on /discoveries + /ai/discover),
+  PREMIUM=unlimited via client X-Premium header (entitlement source of truth = RC SDK per playbook).
+  curl-verified: 6th call -> 402; X-Premium:1 bypass -> 200. GET /api/ai/usage reports usage.
+  On 402 the AI screen redirects to /paywall.
+- CAVEAT: real purchases only work on a native/dev or store build; Expo Go/web use RC Test Store
+  (simulated). User must complete store-side IAP setup (FAQ in payments panel) for live purchases.
+

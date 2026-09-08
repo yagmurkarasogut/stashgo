@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius } from '@/src/theme';
+import { colors, spacing, radius, IMAGES } from '@/src/theme';
 import { useT } from '@/src/i18n';
 
 type Slide = {
@@ -78,7 +79,7 @@ export default function Onboarding() {
       <LinearGradient colors={['#12100B', '#0B0D10', '#0B0D10']} style={StyleSheet.absoluteFillObject} />
 
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <Text style={styles.brand}>TRACE</Text>
+        <Image source={IMAGES.logo} style={styles.brandLogo} contentFit="contain" />
         <Pressable testID="onboarding-skip" onPress={goRegister} hitSlop={12}>
           <Text style={styles.skip}>{t('onboarding.skip')}</Text>
         </Pressable>
@@ -134,6 +135,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   brand: { color: colors.brand, fontSize: 20, fontWeight: '800', letterSpacing: 5 },
+  brandLogo: { width: 40, height: 40 },
   skip: { color: colors.onSurfaceSecondary, fontSize: 14, fontWeight: '600' },
   slide: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl },
   iconHalo: { marginBottom: spacing.xl, alignItems: 'center', justifyContent: 'center' },

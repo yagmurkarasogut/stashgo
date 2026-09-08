@@ -10,16 +10,43 @@ import { useIconFonts } from '@/src/hooks/use-icon-fonts';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { ToastProvider } from '@/src/context/ToastContext';
 import { I18nProvider, useI18n } from '@/src/i18n';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import Purchases from 'react-native-purchases';
+import { initializeRevenueCat, SubscriptionProvider, rcEnabled } from '@/src/lib/revenuecat';
 import { colors } from '@/src/theme';
 
 LogBox.ignoreAllLogs(true);
 SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient();
+
+try {
+  initializeRevenueCat();
+} catch (err) {
+  console.warn('RevenueCat unavailable:', err);
+}
 
 function AuthGate() {
   const { user, loading } = useAuth();
   const { ready } = useI18n();
   const segments = useSegments();
   const router = useRouter();
+
+  // Bind RevenueCat identity to the stable backend user id on every auth path.
+  useEffect(() => {
+    if (!rcEnabled) return;
+    (async () => {
+      try {
+        if (user?.user_id) {
+          await Purchases.logIn(user.user_id);
+        } else {
+          await Purchases.logOut();
+        }
+      } catch (e) {
+        console.warn('[RevenueCat] identity error', e);
+      }
+    })();
+  }, [user?.user_id]);
 
   useEffect(() => {
     if (loading) return;
@@ -43,11 +70,13 @@ function AuthGate() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="add-discovery" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="ai-discover" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="movie/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="list/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="list/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="legal/[doc]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="paywall" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
     </Stack>
   );
 }
@@ -66,11 +95,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="light" />
         <AuthProvider>
-          <I18nProvider>
-            <ToastProvider>
-              <AuthGate />
-            </ToastProvider>
-          </I18nProvider>
+          <QueryClientProvider client={queryClient}>
+            <SubscriptionProvider>
+              <I18nProvider>
+                <ToastProvider>
+                  <AuthGate />
+                </ToastProvider>
+              </I18nProvider>
+            </SubscriptionProvider>
+          </QueryClientProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

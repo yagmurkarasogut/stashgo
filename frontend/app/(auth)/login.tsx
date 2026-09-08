@@ -62,7 +62,7 @@ export default function Login() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={styles.brandMark}>TRACE</Text>
+            <Image source={IMAGES.logo} style={styles.brandLogo} contentFit="contain" />
             <Text style={styles.tagline}>{t('login.tagline')}</Text>
           </View>
 
@@ -126,6 +126,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface },
   scroll: { flexGrow: 1, justifyContent: 'flex-end', padding: spacing.lg, paddingBottom: spacing.xl },
   header: { alignItems: 'center', marginBottom: spacing.xl },
+  brandLogo: { width: 168, height: 168, alignSelf: 'center' },
   brandMark: { color: colors.brand, fontSize: 42, letterSpacing: 8, fontWeight: '700' },
   tagline: { color: colors.onSurfaceSecondary, marginTop: spacing.sm, fontSize: 14 },
   card: {

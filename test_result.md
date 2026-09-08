@@ -179,15 +179,14 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.1"
-  test_sequence: 9
+  version: "1.2"
+  test_sequence: 10
 
 test_plan:
   current_focus:
-    - "Auth: forgot/reset password via email (Emergent Resend)"
-    - "Auth: real account deletion (KVKK)"
-    - "Centralized TR/EN i18n across all screens"
-    - "Settings screen + Forgot password + Legal pages"
+    - "AI discovery from Home (POST /api/ai/discover) — general knowledge, not library-bound"
+    - "Brand rename Trace -> Stash Go (user-facing only)"
+    - "Turkish terminology fix (Vault/Kasa -> Library/Kütüphane)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -195,14 +194,22 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Please regression-test existing Trace flows PLUS the new work.
-      BACKEND (high): /api/auth/change-password, /api/auth/forgot-password (returns ok even for
-      unknown email; sends code for real email accounts), /api/auth/reset-password (wrong/expired
-      code -> 400, valid code -> updates pw and revokes sessions), DELETE /api/auth/account (login
-      blocked after deletion, email reusable). Existing: register, login, discoveries analysis+autosave,
-      library filters/sort/genre, collections CRUD + batch add, semantic search.
-      FRONTEND (high): app boots; onboarding shows exact TR copy when language=TR; Settings language
-      toggle switches UI TR/EN with NO leftover English on core screens; change-password from Settings;
-      forgot-password 2-step screen; legal Terms + Privacy/KVKK open; account deletion confirm flow.
-      Note new backend endpoints require no user credentials (Emergent email key already in .env).
-      Test credentials in /app/memory/test_credentials.md.
+      NEW THIS ITERATION (test these + regression):
+      BACKEND (high): POST /api/ai/discover {query} (auth'd) — returns {intent, message, results:[]}.
+      Results are REAL movies/TV enriched via TMDB, drawn from GENERAL AI knowledge (NOT limited to
+      the user's library) and NOT auto-saved. Verify: (a) an IDENTIFY clue e.g. "a movie where a
+      woman meets a man on a train" returns candidate titles with poster_url/tmdb_id; (b) a RECOMMEND
+      request e.g. "90 minutes suspenseful but not too dark" returns several titles; (c) empty query
+      -> 400; (d) results include saved=false for a fresh account; (e) saving one via POST /api/library
+      then re-querying marks saved=true. Existing /api/discoveries and /api/search must still work.
+      FRONTEND (high): Home shows an "Ask Stash Go" AI entry card + quick chips (testID home-ai-entry).
+      Tapping opens /ai-discover (testID ai-discover-screen): typing a clue + send (ai-input, ai-send)
+      returns result cards (ai-result-<tmdbid>) each with a Save button (ai-save-<tmdbid>); Save adds to
+      library and flips to "Saved". Chips auto-run.
+      BRAND: user-facing "Trace" must now read "Stash Go" (login "New to Stash Go?", onboarding,
+      settings delete text, AI screen). Do NOT expect technical ids/hostnames to change.
+      TURKISH: in TR, main library nav/label must be "Kütüphane"; the word "Vault"/"Kasa"/"Kasanız"
+      must NOT appear anywhere. Home shows "Kütüphaneniz" (not "Kasanız"). Movie/series TITLES must
+      NEVER be translated (they come from TMDB) — verify titles look identical in TR and EN.
+      Prior iteration_9 (auth flows, i18n, settings, legal) already passed; no need to re-deep-test
+      those beyond quick regression. Test credentials in /app/memory/test_credentials.md.
