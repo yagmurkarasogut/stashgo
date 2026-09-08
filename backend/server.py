@@ -6,6 +6,7 @@ import os
 import re
 import uuid
 import base64
+import secrets
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -20,6 +21,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 
 from services import ai_pipeline, tmdb as tmdb_svc
+from services import email as email_svc
 
 # ---------- SETUP ----------
 ROOT_DIR = Path(__file__).parent
@@ -348,6 +350,70 @@ async def delete_account(user=Depends(get_current_user)):
     await db.discoveries.delete_many({"user_id": uid})
     await db.library.delete_many({"user_id": uid})
     await db.collections.delete_many({"user_id": uid})
+    return {"ok": True}
+
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+    lang: Optional[str] = "en"
+
+
+class ResetPasswordBody(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str = Field(min_length=6, max_length=200)
+
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotPasswordBody):
+    """Emails a 6-digit reset code. Always returns ok to avoid account enumeration."""
+    generic = {"ok": True}
+    user = await db.users.find_one({"email": body.email.lower(), "deleted_at": {"$exists": False}})
+    if not user or not user.get("password_hash"):
+        return generic  # non-email accounts (Google) or unknown — say nothing
+    code = f"{secrets.randbelow(1000000):06d}"
+    code_hash = bcrypt.hashpw(code.encode(), bcrypt.gensalt()).decode()
+    await db.password_resets.delete_many({"user_id": user["user_id"]})
+    await db.password_resets.insert_one({
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "code_hash": code_hash,
+        "expires_at": now_utc() + timedelta(minutes=15),
+        "attempts": 0,
+        "created_at": now_utc(),
+    })
+    if email_svc.is_configured():
+        subject, html = email_svc.reset_code_email(user.get("name") or "", code, body.lang or "en")
+        try:
+            await email_svc.send_email(to=user["email"], subject=subject, html=html)
+        except HTTPException:
+            pass  # don't leak delivery status to the caller
+    else:
+        logger.warning("Password reset requested but email service not configured")
+    return generic
+
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetPasswordBody):
+    rec = await db.password_resets.find_one({"email": body.email.lower()})
+    if not rec:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    exp = rec["expires_at"]
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now_utc():
+        await db.password_resets.delete_one({"_id": rec["_id"]})
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    if rec.get("attempts", 0) >= 5:
+        await db.password_resets.delete_one({"_id": rec["_id"]})
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code.")
+    if not bcrypt.checkpw(body.code.encode(), rec["code_hash"].encode()):
+        await db.password_resets.update_one({"_id": rec["_id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    new_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    await db.users.update_one({"user_id": rec["user_id"]}, {"$set": {"password_hash": new_hash}})
+    await db.password_resets.delete_many({"user_id": rec["user_id"]})
+    await db.user_sessions.delete_many({"user_id": rec["user_id"]})
     return {"ok": True}
 
 

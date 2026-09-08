@@ -5,28 +5,28 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 const TYPE_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'movie', label: 'Movies' },
-  { key: 'tv', label: 'TV' },
+  { key: 'all', labelKey: 'library.typeAll' },
+  { key: 'movie', labelKey: 'library.typeMovie' },
+  { key: 'tv', labelKey: 'library.typeTv' },
 ];
 
 const STATUS_FILTERS = [
-  { key: 'all', label: 'Any status' },
-  { key: 'want_to_watch', label: 'Want to Watch' },
-  { key: 'watching', label: 'Watching' },
-  { key: 'watched', label: 'Watched' },
+  { key: 'want_to_watch', labelKey: 'library.statusWant' },
+  { key: 'watching', labelKey: 'library.statusWatching' },
+  { key: 'watched', labelKey: 'library.statusWatched' },
 ];
 
 const GENRES = ['All', 'Drama', 'Sci-Fi', 'Horror', 'Thriller', 'Comedy', 'Romance', 'Documentary', 'Animation'];
 
 const SORTS = [
-  { key: 'recent', label: 'Recently Added' },
-  { key: 'release', label: 'Release Date' },
-  { key: 'rating', label: 'Rating' },
-  { key: 'alpha', label: 'Alphabetical' },
+  { key: 'recent', labelKey: 'library.sortRecent' },
+  { key: 'release', labelKey: 'library.sortRelease' },
+  { key: 'rating', labelKey: 'library.sortRating' },
+  { key: 'alpha', labelKey: 'library.sortAlpha' },
 ];
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -36,6 +36,7 @@ const CELL_W = (SCREEN_W - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
 export default function Library() {
   const router = useRouter();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<LibraryEntry[]>([]);
   const [typeF, setTypeF] = useState('all');
@@ -63,16 +64,17 @@ export default function Library() {
 
   useEffect(() => { load(); }, [load]);
 
-  const sortLabel = SORTS.find((s) => s.key === sort)?.label || 'Sort';
+  const sortLabel = SORTS.find((s) => s.key === sort)?.labelKey;
+  const sortText = sortLabel ? t(sortLabel) : t('library.sort');
 
   return (
     <View style={styles.root} testID="library-screen">
       <View style={[styles.stickyHeader, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>Library</Text>
+          <Text style={styles.title}>{t('library.title')}</Text>
           <Pressable testID="library-sort-button" onPress={() => setSortOpen((v) => !v)} style={styles.sortBtn}>
             <Ionicons name="swap-vertical" size={14} color={colors.brand} />
-            <Text style={styles.sortText}>{sortLabel}</Text>
+            <Text style={styles.sortText}>{sortText}</Text>
           </Pressable>
         </View>
 
@@ -85,7 +87,7 @@ export default function Library() {
                 onPress={() => { setSort(s.key); setSortOpen(false); }}
                 style={[styles.sortItem, s.key === sort && styles.sortItemActive]}
               >
-                <Text style={[styles.sortItemText, s.key === sort && { color: colors.brand }]}>{s.label}</Text>
+                <Text style={[styles.sortItemText, s.key === sort && { color: colors.brand }]}>{t(s.labelKey)}</Text>
                 {s.key === sort ? <Ionicons name="checkmark" size={14} color={colors.brand} /> : null}
               </Pressable>
             ))}
@@ -97,16 +99,16 @@ export default function Library() {
             const active = f.key === typeF;
             return (
               <Pressable key={f.key} testID={`library-type-${f.key}`} onPress={() => setTypeF(f.key)} style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(f.labelKey)}</Text>
               </Pressable>
             );
           })}
           <View style={styles.chipDivider} />
-          {STATUS_FILTERS.filter((s) => s.key !== 'all').map((f) => {
+          {STATUS_FILTERS.map((f) => {
             const active = f.key === statusF;
             return (
               <Pressable key={f.key} testID={`library-status-${f.key}`} onPress={() => setStatusF(active ? 'all' : f.key)} style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(f.labelKey)}</Text>
               </Pressable>
             );
           })}
@@ -117,7 +119,7 @@ export default function Library() {
             const active = g === genreF;
             return (
               <Pressable key={g} testID={`library-genre-${g}`} onPress={() => setGenreF(g)} style={[styles.genreChip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{g}</Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(`genres.${g}`)}</Text>
               </Pressable>
             );
           })}
@@ -136,8 +138,8 @@ export default function Library() {
           <View style={styles.empty}>
             <Image source={{ uri: IMAGES.emptyTheater }} style={styles.emptyImg} contentFit="cover" />
             <View style={styles.emptyScrim} />
-            <Text style={styles.emptyTitle}>Your memory vault is empty</Text>
-            <Text style={styles.emptySub}>Save your first Reel, article, or screenshot.</Text>
+            <Text style={styles.emptyTitle}>{t('library.emptyTitle')}</Text>
+            <Text style={styles.emptySub}>{t('library.emptySub')}</Text>
           </View>
         )}
         renderItem={({ item }) => (

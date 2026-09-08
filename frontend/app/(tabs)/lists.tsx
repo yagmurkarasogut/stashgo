@@ -6,10 +6,12 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, CustomList } from '@/src/api/client';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 export default function Lists() {
   const router = useRouter();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [lists, setLists] = useState<CustomList[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,21 +32,21 @@ export default function Lists() {
   return (
     <View style={styles.root} testID="lists-screen">
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.title}>Custom Lists</Text>
+        <Text style={styles.title}>{t('lists.title')}</Text>
         <View style={styles.searchRow}>
           <Ionicons name="search" size={16} color={colors.onSurfaceTertiary} style={{ marginLeft: spacing.md }} />
           <TextInput
             testID="lists-search-input"
             value={query}
             onChangeText={setQuery}
-            placeholder="Search your lists"
+            placeholder={t('lists.searchPlaceholder')}
             placeholderTextColor={colors.onSurfaceTertiary}
             style={styles.searchInput}
           />
         </View>
         <Pressable testID="lists-create-button" onPress={() => router.push('/list/new')} style={styles.createBtn}>
           <Ionicons name="add" size={20} color={colors.onBrand} />
-          <Text style={styles.createBtnText}>Create New List</Text>
+          <Text style={styles.createBtnText}>{t('lists.createNew')}</Text>
         </Pressable>
       </View>
 
@@ -56,7 +58,7 @@ export default function Lists() {
         ListEmptyComponent={() => (
           <View style={styles.empty}>
             <Ionicons name="albums-outline" size={40} color={colors.onSurfaceTertiary} />
-            <Text style={styles.emptyText}>No lists yet. Tap “Create New List” — a movie can live in as many lists as you like.</Text>
+            <Text style={styles.emptyText}>{t('lists.empty')}</Text>
           </View>
         )}
         renderItem={({ item }) => (
@@ -72,7 +74,7 @@ export default function Lists() {
             </View>
             <View style={{ flex: 1, marginLeft: spacing.md }}>
               <Text style={styles.listName}>{item.name}</Text>
-              <Text style={styles.listCount}>{item.item_count} {item.item_count === 1 ? 'title' : 'titles'}</Text>
+              <Text style={styles.listCount}>{t('lists.titleCount', { n: item.item_count })}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.onSurfaceTertiary} />
           </Pressable>

@@ -5,61 +5,63 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, radius } from '@/src/theme';
+import { useT } from '@/src/i18n';
 
 type Slide = {
   key: string;
   icon: keyof typeof Ionicons.glyphMap;
-  chips?: { icon: keyof typeof Ionicons.glyphMap; label: string }[];
-  title: string;
-  body: string;
+  chips?: { icon: keyof typeof Ionicons.glyphMap; labelKey: string }[];
+  titleKey: string;
+  bodyKey: string;
 };
 
 const SLIDES: Slide[] = [
   {
     key: 'welcome',
     icon: 'sparkles',
-    title: 'Welcome to Trace',
-    body: 'Every movie and show you stumble across — captured into one searchable library. Here’s how it works.',
+    titleKey: 'onboarding.s1title',
+    bodyKey: 'onboarding.s1body',
   },
   {
     key: 'share',
     icon: 'share-social',
     chips: [
-      { icon: 'logo-instagram', label: 'Reels' },
-      { icon: 'arrow-forward', label: 'Share' },
-      { icon: 'sparkles', label: 'Trace' },
+      { icon: 'logo-instagram', labelKey: 'onboarding.chips.reels' },
+      { icon: 'arrow-forward', labelKey: 'onboarding.chips.share' },
+      { icon: 'sparkles', labelKey: 'onboarding.chips.trace' },
     ],
-    title: 'Share it straight from Instagram',
-    body: 'On any Reel, tap Share → choose Trace. It analyzes the post and saves the movie to your library automatically — no extra taps.',
+    titleKey: 'onboarding.s2title',
+    bodyKey: 'onboarding.s2body',
   },
   {
     key: 'sources',
     icon: 'layers',
     chips: [
-      { icon: 'logo-youtube', label: 'YouTube URL' },
-      { icon: 'image', label: 'Screenshot' },
-      { icon: 'create', label: 'Type it' },
+      { icon: 'logo-youtube', labelKey: 'onboarding.chips.youtube' },
+      { icon: 'image', labelKey: 'onboarding.chips.screenshot' },
+      { icon: 'create', labelKey: 'onboarding.chips.type' },
     ],
-    title: 'Any source works',
-    body: 'Paste a YouTube link, screenshot an article, or just type what you remember. Trace reads them all and finds the title.',
+    titleKey: 'onboarding.s3title',
+    bodyKey: 'onboarding.s3body',
   },
   {
     key: 'ai',
     icon: 'film',
-    title: 'One analysis, every title',
-    body: 'Trace spots multiple movies or series in a single post — and can even identify a film from a video clip when the name is never mentioned.',
+    titleKey: 'onboarding.s4title',
+    bodyKey: 'onboarding.s4body',
   },
   {
     key: 'lists',
     icon: 'albums',
-    title: 'Build & share lists',
-    body: 'Group titles into lists like “Best Horror” or “Watch This Year”, add many at once, and share them with friends.',
+    titleKey: 'onboarding.s5title',
+    bodyKey: 'onboarding.s5body',
   },
 ];
 
 export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [index, setIndex] = useState(0);
 
   const goRegister = () => router.replace('/(auth)/register');
@@ -78,7 +80,7 @@ export default function Onboarding() {
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
         <Text style={styles.brand}>TRACE</Text>
         <Pressable testID="onboarding-skip" onPress={goRegister} hitSlop={12}>
-          <Text style={styles.skip}>Skip</Text>
+          <Text style={styles.skip}>{t('onboarding.skip')}</Text>
         </Pressable>
       </View>
 
@@ -92,19 +94,19 @@ export default function Onboarding() {
         {item.chips ? (
           <View style={styles.chipsFlow}>
             {item.chips.map((c, i) => (
-              <React.Fragment key={c.label}>
+              <React.Fragment key={c.labelKey}>
                 {i > 0 ? <Ionicons name="chevron-forward" size={14} color={colors.onSurfaceTertiary} /> : null}
                 <View style={styles.chip}>
                   <Ionicons name={c.icon} size={15} color={colors.brand} />
-                  <Text style={styles.chipText}>{c.label}</Text>
+                  <Text style={styles.chipText}>{t(c.labelKey)}</Text>
                 </View>
               </React.Fragment>
             ))}
           </View>
         ) : null}
 
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.body}>{item.body}</Text>
+        <Text style={styles.title}>{t(item.titleKey)}</Text>
+        <Text style={styles.body}>{t(item.bodyKey)}</Text>
       </View>
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
@@ -116,12 +118,12 @@ export default function Onboarding() {
           ))}
         </View>
         <Pressable testID="onboarding-next" onPress={next} style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}>
-          <Text style={styles.ctaText}>{isLast ? 'Get Started' : 'Next'}</Text>
+          <Text style={styles.ctaText}>{isLast ? t('onboarding.getStarted') : t('onboarding.next')}</Text>
           <Ionicons name={isLast ? 'arrow-forward-circle' : 'arrow-forward'} size={18} color={colors.onBrand} />
         </Pressable>
         <Pressable testID="onboarding-goto-login" onPress={() => router.replace('/(auth)/login')} style={styles.loginRow}>
-          <Text style={styles.loginMuted}>Already have an account?</Text>
-          <Text style={styles.loginLink}>Sign in</Text>
+          <Text style={styles.loginMuted}>{t('onboarding.alreadyHave')}</Text>
+          <Text style={styles.loginLink}>{t('onboarding.signIn')}</Text>
         </Pressable>
       </View>
     </View>

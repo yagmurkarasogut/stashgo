@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useIconFonts } from '@/src/hooks/use-icon-fonts';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { ToastProvider } from '@/src/context/ToastContext';
+import { I18nProvider, useI18n } from '@/src/i18n';
 import { colors } from '@/src/theme';
 
 LogBox.ignoreAllLogs(true);
@@ -16,6 +17,7 @@ SplashScreen.preventAutoHideAsync();
 
 function AuthGate() {
   const { user, loading } = useAuth();
+  const { ready } = useI18n();
   const segments = useSegments();
   const router = useRouter();
 
@@ -29,7 +31,7 @@ function AuthGate() {
     }
   }, [user, loading, segments, router]);
 
-  if (loading) {
+  if (loading || !ready) {
     return (
       <View style={styles.loading} testID="app-loading">
         <ActivityIndicator color={colors.brand} size="large" />
@@ -45,6 +47,7 @@ function AuthGate() {
       <Stack.Screen name="movie/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="list/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="list/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="legal/[doc]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
@@ -63,9 +66,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="light" />
         <AuthProvider>
-          <ToastProvider>
-            <AuthGate />
-          </ToastProvider>
+          <I18nProvider>
+            <ToastProvider>
+              <AuthGate />
+            </ToastProvider>
+          </I18nProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

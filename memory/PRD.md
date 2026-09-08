@@ -112,3 +112,27 @@ Backend externally healthy (health/register 200, valid SSL, CORS *). User report
 their specific phone needs VPN though others don't. Next: deployer-agent RCA covering
 DNS/IPv4-IPv6/SSL/firewall + confirm prod build never bakes preview URL.
 
+
+### SCOPE FREEZE iteration (Trace 1.0) — COMPLETE & TESTED (iteration_9)
+User froze scope: stabilize + production-ready, NO new roadmap features (Nostr/ads/
+analytics/rankings/ratings all deferred). Delivered this turn:
+- Complete TR/EN i18n: src/i18n/{index.tsx,translations.ts}; I18nProvider wired in _layout
+  (device-locale default via expo-localization, persisted key 'trace_language'). Localized
+  ALL screens: tabs, login, register, onboarding (EXACT provided TR copy), home, library
+  (filters/sorts/genres), lists, search, profile, settings, add-discovery, movie detail,
+  list detail, list new. TR verified with no English leftover on core screens.
+- Forgot/reset password via Emergent-managed Resend (backend/services/email.py, key already
+  in backend/.env: EMERGENT_EMAIL_KEY + EMAIL_FROM_NAME=Trace). Flow: /auth/forgot-password
+  (non-enumerating, 6-digit bcrypt code, 15min) + /auth/reset-password (wrong/expired 400,
+  >5 attempts 429). Email delivery verified. Frontend: app/(auth)/forgot.tsx 2-step.
+- Legal screens app/legal/[doc].tsx (bilingual Terms + Privacy/KVKK), linked from Settings.
+- Settings finalized (exact TR delete-account copy).
+- Backend: change-password, account deletion (KVKK), admin role seed (yagmurkarasogut@gmail.com)
+  — all from prior turn, re-verified.
+Testing: iteration_9 = 18/18 backend pytest + full frontend PASS. Retest false.
+
+### STILL PENDING for production release (reported to user, not yet done)
+- VPN/production connectivity RCA (needs deployer agent on production side).
+- App Store / Google Play config audit (app.json identifiers/version/build/permissions).
+- Deterministic build-time production API URL (vs current client.ts runtime safety-net).
+

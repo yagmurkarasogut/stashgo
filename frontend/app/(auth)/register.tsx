@@ -5,10 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Link } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 export default function Register() {
   const { register } = useAuth();
+  const t = useT();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,11 +18,11 @@ export default function Register() {
   const [err, setErr] = useState('');
 
   const submit = async () => {
-    if (!email || !password) { setErr('Email and password required'); return; }
-    if (password.length < 6) { setErr('Password must be at least 6 characters'); return; }
+    if (!email || !password) { setErr(t('register.errRequired')); return; }
+    if (password.length < 6) { setErr(t('register.errMin')); return; }
     setBusy(true); setErr('');
     try { await register(email.trim(), password, name.trim() || undefined); }
-    catch (e: any) { setErr(e?.detail || 'Registration failed'); }
+    catch (e: any) { setErr(e?.detail || t('register.errRegFailed')); }
     finally { setBusy(false); }
   };
 
@@ -36,14 +38,14 @@ export default function Register() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Text style={styles.brandMark}>TRACE</Text>
-            <Text style={styles.tagline}>Start your memory vault.</Text>
+            <Text style={styles.tagline}>{t('register.tagline')}</Text>
           </View>
 
           <BlurView intensity={40} tint="dark" style={styles.card}>
-            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.title}>{t('register.createAccount')}</Text>
             <TextInput
               testID="register-name-input"
-              placeholder="Name (optional)"
+              placeholder={t('register.nameOptional')}
               placeholderTextColor={colors.onSurfaceTertiary}
               value={name}
               onChangeText={setName}
@@ -51,7 +53,7 @@ export default function Register() {
             />
             <TextInput
               testID="register-email-input"
-              placeholder="Email"
+              placeholder={t('register.email')}
               placeholderTextColor={colors.onSurfaceTertiary}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -61,7 +63,7 @@ export default function Register() {
             />
             <TextInput
               testID="register-password-input"
-              placeholder="Password (min 6 chars)"
+              placeholder={t('register.passwordMin')}
               placeholderTextColor={colors.onSurfaceTertiary}
               secureTextEntry
               value={password}
@@ -70,12 +72,12 @@ export default function Register() {
             />
             {err ? <Text style={styles.err} testID="register-error">{err}</Text> : null}
             <Pressable testID="register-submit-button" onPress={submit} disabled={busy} style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}>
-              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Create account</Text>}
+              {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>{t('register.createAccount')}</Text>}
             </Pressable>
             <Link href="/(auth)/login" asChild>
               <Pressable testID="register-goto-login" style={styles.footerRow}>
-                <Text style={styles.footerMuted}>Already have an account?</Text>
-                <Text style={styles.footerLink}>Sign in</Text>
+                <Text style={styles.footerMuted}>{t('register.alreadyHave')}</Text>
+                <Text style={styles.footerLink}>{t('register.signIn')}</Text>
               </Pressable>
             </Link>
           </BlurView>

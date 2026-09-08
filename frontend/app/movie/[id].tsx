@@ -8,12 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
-const STATUSES: { key: LibraryEntry['watch_status']; label: string; icon: any }[] = [
-  { key: 'want_to_watch', label: 'Want', icon: 'bookmark-outline' },
-  { key: 'watching', label: 'Watching', icon: 'play-circle-outline' },
-  { key: 'watched', label: 'Watched', icon: 'checkmark-circle-outline' },
+const STATUSES: { key: LibraryEntry['watch_status']; labelKey: string; icon: any }[] = [
+  { key: 'want_to_watch', labelKey: 'detail.statusWant', icon: 'bookmark-outline' },
+  { key: 'watching', labelKey: 'detail.statusWatching', icon: 'play-circle-outline' },
+  { key: 'watched', labelKey: 'detail.statusWatched', icon: 'checkmark-circle-outline' },
 ];
 
 export default function MovieDetail() {
@@ -29,6 +30,7 @@ export default function MovieDetail() {
   const [creatingList, setCreatingList] = useState(false);
   const [showTrailer, setShowTrailer] = useState(false);
   const toast = useToast();
+  const t = useT();
 
   const loadLists = useCallback(async () => {
     try {
@@ -128,9 +130,9 @@ export default function MovieDetail() {
                 </Pressable>
               ) : null}
               <View style={styles.heroContent}>
-                <Text style={styles.mediaBadge}>{entry.media_type.toUpperCase()} {entry.year ? `· ${entry.year}` : ''}</Text>
+                <Text style={styles.mediaBadge}>{t(`mediaType.${entry.media_type}`)} {entry.year ? `· ${entry.year}` : ''}</Text>
                 <Text style={styles.heroTitle}>{entry.title}</Text>
-                {entry.director ? <Text style={styles.heroDir}>Directed by {entry.director}</Text> : null}
+                {entry.director ? <Text style={styles.heroDir}>{t('detail.directedBy', { name: entry.director })}</Text> : null}
                 <View style={styles.metaChips}>
                   {entry.tmdb_rating != null ? (
                     <View style={styles.metaChip}>
@@ -141,7 +143,7 @@ export default function MovieDetail() {
               {entry.runtime ? (
                 <View style={styles.metaChip}>
                   <Ionicons name="time-outline" size={12} color={colors.onSurfaceSecondary} />
-                  <Text style={styles.metaChipText}>{entry.runtime}m</Text>
+                  <Text style={styles.metaChipText}>{t('detail.runtime', { n: entry.runtime })}</Text>
                 </View>
               ) : null}
             </View>
@@ -153,14 +155,14 @@ export default function MovieDetail() {
         <View style={styles.body}>
           {entry.overview ? (
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Overview</Text>
+              <Text style={styles.cardLabel}>{t('detail.overview')}</Text>
               <Text style={styles.cardBody}>{entry.overview}</Text>
             </View>
           ) : null}
 
           {entry.cast.length > 0 && (
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Cast</Text>
+              <Text style={styles.cardLabel}>{t('detail.cast')}</Text>
               <Text style={styles.cardBody}>{entry.cast.join(' · ')}</Text>
             </View>
           )}
@@ -175,7 +177,7 @@ export default function MovieDetail() {
 
           {entry.watch_providers && entry.watch_providers.length > 0 ? (
             <View style={styles.card} testID="detail-providers">
-              <Text style={styles.cardLabel}>Where to watch</Text>
+              <Text style={styles.cardLabel}>{t('detail.whereToWatch')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
                 {entry.watch_providers.map((p, i) => (
                   <View key={`${p.name}-${i}`} style={styles.provider}>
@@ -195,7 +197,7 @@ export default function MovieDetail() {
           ) : null}
 
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Watch status</Text>
+            <Text style={styles.cardLabel}>{t('detail.watchStatus')}</Text>
             <View style={styles.statusRow}>
               {STATUSES.map((s) => {
                 const active = entry.watch_status === s.key;
@@ -207,7 +209,7 @@ export default function MovieDetail() {
                     style={[styles.statusBtn, active && styles.statusBtnActive]}
                   >
                     <Ionicons name={s.icon} size={16} color={active ? colors.brand : colors.onSurfaceTertiary} />
-                    <Text style={[styles.statusText, active && { color: colors.brand }]}>{s.label}</Text>
+                    <Text style={[styles.statusText, active && { color: colors.brand }]}>{t(s.labelKey)}</Text>
                   </Pressable>
                 );
               })}
@@ -215,7 +217,7 @@ export default function MovieDetail() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Your rating (0–10)</Text>
+            <Text style={styles.cardLabel}>{t('detail.yourRating')}</Text>
             <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
               <TextInput
                 testID="detail-rating-input"
@@ -228,32 +230,32 @@ export default function MovieDetail() {
                 style={styles.ratingInput}
               />
               <Pressable testID="detail-rating-save" onPress={saveRating} style={styles.saveBtn}>
-                <Text style={styles.saveBtnText}>Save</Text>
+                <Text style={styles.saveBtnText}>{t('detail.save')}</Text>
               </Pressable>
             </View>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Note</Text>
+            <Text style={styles.cardLabel}>{t('detail.note')}</Text>
             <TextInput
               testID="detail-note-input"
               value={note}
               onChangeText={setNote}
               onEndEditing={saveNote}
               multiline
-              placeholder="A quick thought…"
+              placeholder={t('detail.notePlaceholder')}
               placeholderTextColor={colors.onSurfaceTertiary}
               style={styles.noteInput}
             />
             <Pressable testID="detail-note-save" onPress={saveNote} style={[styles.saveBtn, { alignSelf: 'flex-end' }]}>
-              <Text style={styles.saveBtnText}>Save note</Text>
+              <Text style={styles.saveBtnText}>{t('detail.saveNote')}</Text>
             </Pressable>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Add to lists</Text>
+            <Text style={styles.cardLabel}>{t('detail.addToLists')}</Text>
             {lists.length === 0 ? (
-              <Text style={styles.listsEmpty}>No lists yet. Create one below.</Text>
+              <Text style={styles.listsEmpty}>{t('detail.noLists')}</Text>
             ) : (
               <View style={styles.listsWrap}>
                 {lists.map((l) => (
@@ -274,20 +276,20 @@ export default function MovieDetail() {
                 testID="detail-new-list-input"
                 value={newListName}
                 onChangeText={setNewListName}
-                placeholder="New list name…"
+                placeholder={t('detail.newListPlaceholder')}
                 placeholderTextColor={colors.onSurfaceTertiary}
                 style={styles.newListInput}
                 onSubmitEditing={createList}
               />
               <Pressable testID="detail-create-list" onPress={createList} disabled={creatingList} style={styles.saveBtn}>
-                {creatingList ? <ActivityIndicator size="small" color={colors.onBrand} /> : <Text style={styles.saveBtnText}>Create</Text>}
+                {creatingList ? <ActivityIndicator size="small" color={colors.onBrand} /> : <Text style={styles.saveBtnText}>{t('detail.create')}</Text>}
               </Pressable>
             </View>
           </View>
 
           <Pressable testID="detail-remove" onPress={remove} style={styles.remove}>
             <Ionicons name="trash-outline" size={16} color={colors.error} />
-            <Text style={styles.removeText}>Remove from library</Text>
+            <Text style={styles.removeText}>{t('detail.removeFromLibrary')}</Text>
           </Pressable>
         </View>
       </ScrollView>

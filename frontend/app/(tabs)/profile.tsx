@@ -4,10 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius } from '@/src/theme';
 
 export default function Profile() {
   const { user, logout } = useAuth();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   return (
@@ -26,20 +28,20 @@ export default function Profile() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>About</Text>
-          <View style={styles.row}><Text style={styles.rowKey}>Version</Text><Text style={styles.rowVal}>0.1.0</Text></View>
-          <View style={styles.row}><Text style={styles.rowKey}>Data enrichment</Text><Text style={styles.rowVal}>TMDB (mock)</Text></View>
-          <View style={styles.row}><Text style={styles.rowKey}>AI engine</Text><Text style={styles.rowVal}>Gemini 3 Flash</Text></View>
+          <Text style={styles.sectionLabel}>{t('profile.about')}</Text>
+          <View style={styles.row}><Text style={styles.rowKey}>{t('profile.version')}</Text><Text style={styles.rowVal}>1.0.0</Text></View>
+          <View style={styles.row}><Text style={styles.rowKey}>{t('profile.dataEnrichment')}</Text><Text style={styles.rowVal}>TMDB</Text></View>
+          <View style={styles.row}><Text style={styles.rowKey}>{t('profile.aiEngine')}</Text><Text style={styles.rowVal}>Gemini 3 Flash</Text></View>
         </View>
 
         <Pressable testID="profile-settings-button" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.logout, { borderColor: colors.border, marginBottom: spacing.md }, pressed && { opacity: 0.8 }]}>
           <Ionicons name="settings-outline" size={18} color={colors.brand} />
-          <Text style={[styles.logoutText, { color: colors.brand }]}>Settings & Privacy</Text>
+          <Text style={[styles.logoutText, { color: colors.brand }]}>{t('profile.settingsPrivacy')}</Text>
         </Pressable>
 
         <Pressable testID="profile-logout-button" onPress={logout} style={({ pressed }) => [styles.logout, pressed && { opacity: 0.8 }]}>
           <Ionicons name="log-out-outline" size={18} color={colors.error} />
-          <Text style={styles.logoutText}>Sign out</Text>
+          <Text style={styles.logoutText}>{t('profile.signOut')}</Text>
         </Pressable>
       </ScrollView>
     </View>

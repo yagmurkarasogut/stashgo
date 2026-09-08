@@ -5,19 +5,16 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 type Match = LibraryEntry & { match_reason?: string; match_score?: number };
 
-const SUGGESTIONS = [
-  'Movie about time travel',
-  "Nolan movie with black holes",
-  'That thriller I saved last month',
-  'Dark comedy TV shows',
-];
+const SUGGESTION_KEYS = ['search.s1', 'search.s2', 'search.s3', 'search.s4'];
 
 export default function Search() {
   const router = useRouter();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Match[]>([]);
@@ -44,33 +41,36 @@ export default function Search() {
     <View style={styles.root} testID="search-screen">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-          <Text style={styles.title}>Semantic Search</Text>
-          <Text style={styles.subtitle}>Ask in your own words. Trace understands.</Text>
+          <Text style={styles.title}>{t('search.title')}</Text>
+          <Text style={styles.subtitle}>{t('search.subtitle')}</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
           {!ran && (
             <View style={styles.suggestBox}>
-              {SUGGESTIONS.map((s) => (
-                <Pressable key={s} testID={`search-suggest-${s}`} onPress={() => run(s)} style={styles.suggestPill}>
-                  <Ionicons name="sparkles" size={12} color={colors.brand} />
-                  <Text style={styles.suggestText}>{s}</Text>
-                </Pressable>
-              ))}
+              {SUGGESTION_KEYS.map((k) => {
+                const s = t(k);
+                return (
+                  <Pressable key={k} testID={`search-suggest-${k}`} onPress={() => run(s)} style={styles.suggestPill}>
+                    <Ionicons name="sparkles" size={12} color={colors.brand} />
+                    <Text style={styles.suggestText}>{s}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           )}
 
           {loading && (
             <View style={{ padding: spacing.xxl, alignItems: 'center' }}>
               <ActivityIndicator color={colors.brand} />
-              <Text style={styles.scanning}>Scanning vault…</Text>
+              <Text style={styles.scanning}>{t('search.scanning')}</Text>
             </View>
           )}
 
           {ran && !loading && results.length === 0 && (
             <View style={styles.emptyResults}>
               <Ionicons name="search-outline" size={40} color={colors.onSurfaceTertiary} />
-              <Text style={styles.emptyText}>No matches. Try broader wording.</Text>
+              <Text style={styles.emptyText}>{t('search.noMatches')}</Text>
             </View>
           )}
 
@@ -85,7 +85,7 @@ export default function Search() {
                 <Image source={{ uri: r.poster_url || IMAGES.posterFallback }} style={styles.resultImg} contentFit="cover" />
                 <View style={styles.resultBody}>
                   <Text style={styles.resultTitle} numberOfLines={1}>{r.title}</Text>
-                  <Text style={styles.resultMeta}>{r.media_type.toUpperCase()} {r.year ? `· ${r.year}` : ''} {r.director ? `· ${r.director}` : ''}</Text>
+                  <Text style={styles.resultMeta}>{t(`mediaType.${r.media_type}`)} {r.year ? `· ${r.year}` : ''} {r.director ? `· ${r.director}` : ''}</Text>
                   {r.match_reason ? (
                     <View style={styles.reasonPill}>
                       <Ionicons name="sparkles" size={11} color={colors.brand} />
@@ -103,7 +103,7 @@ export default function Search() {
             <Ionicons name="sparkles-outline" size={18} color={colors.brand} style={{ marginLeft: spacing.md }} />
             <TextInput
               testID="search-input"
-              placeholder="Ask about your vault…"
+              placeholder={t('search.inputPlaceholder')}
               placeholderTextColor={colors.onSurfaceTertiary}
               value={q}
               onChangeText={setQ}

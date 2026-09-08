@@ -6,28 +6,30 @@ import { BlurView } from 'expo-blur';
 import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
+  const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<null | 'email' | 'google'>(null);
   const [err, setErr] = useState('');
 
   const doEmail = async () => {
-    if (!email || !password) { setErr('Enter email and password'); return; }
+    if (!email || !password) { setErr(t('login.errEnterCreds')); return; }
     setBusy('email'); setErr('');
     try { await login(email.trim(), password); }
-    catch (e: any) { setErr(e?.detail || 'Login failed'); }
+    catch (e: any) { setErr(e?.detail || t('login.errLoginFailed')); }
     finally { setBusy(null); }
   };
 
   const doGoogle = async () => {
     setBusy('google'); setErr('');
     try { await loginWithGoogle(); }
-    catch (e: any) { setErr(e?.detail || 'Google sign-in failed'); }
+    catch (e: any) { setErr(e?.detail || t('login.errGoogleFailed')); }
     finally { setBusy(null); }
   };
 
@@ -43,15 +45,15 @@ export default function Login() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <Text style={styles.brandMark}>TRACE</Text>
-            <Text style={styles.tagline}>Your personal movie & TV memory.</Text>
+            <Text style={styles.tagline}>{t('login.tagline')}</Text>
           </View>
 
           <BlurView intensity={40} tint="dark" style={styles.card}>
-            <Text style={styles.title}>Sign in</Text>
+            <Text style={styles.title}>{t('login.signIn')}</Text>
 
             <TextInput
               testID="login-email-input"
-              placeholder="Email"
+              placeholder={t('login.email')}
               placeholderTextColor={colors.onSurfaceTertiary}
               autoCapitalize="none"
               autoComplete="email"
@@ -62,7 +64,7 @@ export default function Login() {
             />
             <TextInput
               testID="login-password-input"
-              placeholder="Password"
+              placeholder={t('login.password')}
               placeholderTextColor={colors.onSurfaceTertiary}
               secureTextEntry
               value={password}
@@ -73,22 +75,26 @@ export default function Login() {
             {err ? <Text style={styles.err} testID="login-error">{err}</Text> : null}
 
             <Pressable testID="login-submit-button" onPress={doEmail} disabled={busy !== null} style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}>
-              {busy === 'email' ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>Continue</Text>}
+              {busy === 'email' ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>{t('login.continue')}</Text>}
+            </Pressable>
+
+            <Pressable testID="login-forgot" onPress={() => router.push('/(auth)/forgot')} style={styles.forgotRow}>
+              <Text style={styles.forgotText}>{t('login.forgotPassword')}</Text>
             </Pressable>
 
             <View style={styles.divider}>
-              <View style={styles.hr} /><Text style={styles.dividerText}>or</Text><View style={styles.hr} />
+              <View style={styles.hr} /><Text style={styles.dividerText}>{t('common.or')}</Text><View style={styles.hr} />
             </View>
 
             <Pressable testID="login-google-button" onPress={doGoogle} disabled={busy !== null} style={({ pressed }) => [styles.google, pressed && { opacity: 0.85 }]}>
               <Ionicons name="logo-google" size={18} color={colors.onSurface} />
-              <Text style={styles.googleText}>{busy === 'google' ? 'Opening…' : 'Continue with Google'}</Text>
+              <Text style={styles.googleText}>{busy === 'google' ? t('login.opening') : t('login.continueGoogle')}</Text>
             </Pressable>
 
             <Link href="/(auth)/onboarding" asChild>
               <Pressable testID="login-goto-register" style={styles.footerRow}>
-                <Text style={styles.footerMuted}>New to Trace?</Text>
-                <Text style={styles.footerLink}>Create account</Text>
+                <Text style={styles.footerMuted}>{t('login.newToTrace')}</Text>
+                <Text style={styles.footerLink}>{t('login.createAccount')}</Text>
               </Pressable>
             </Link>
           </BlurView>
@@ -145,4 +151,6 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: spacing.xs, justifyContent: 'center', marginTop: spacing.lg },
   footerMuted: { color: colors.onSurfaceTertiary, fontSize: 13 },
   footerLink: { color: colors.brand, fontSize: 13, fontWeight: '600' },
+  forgotRow: { alignItems: 'center', marginTop: spacing.md },
+  forgotText: { color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: '600' },
 });

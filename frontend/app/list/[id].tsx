@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, CustomList } from '@/src/api/client';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -16,6 +17,7 @@ export default function ListDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [list, setList] = useState<CustomList | null>(null);
 
   const load = useCallback(async () => {
@@ -41,8 +43,8 @@ export default function ListDetail() {
           <Ionicons name="chevron-back" size={26} color={colors.onSurface} />
         </Pressable>
         <View style={{ flex: 1, marginLeft: spacing.sm }}>
-          <Text style={styles.title} numberOfLines={1}>{list?.name || 'List'}</Text>
-          <Text style={styles.count}>{entries.length} {entries.length === 1 ? 'title' : 'titles'}</Text>
+          <Text style={styles.title} numberOfLines={1}>{list?.name || t('listDetail.fallback')}</Text>
+          <Text style={styles.count}>{t('listDetail.titleCount', { n: entries.length })}</Text>
         </View>
         <Pressable testID="list-delete" onPress={deleteList} hitSlop={12}>
           <Ionicons name="trash-outline" size={20} color={colors.error} />
@@ -55,7 +57,7 @@ export default function ListDetail() {
         style={styles.addBtn}
       >
         <Ionicons name="add" size={18} color={colors.onBrand} />
-        <Text style={styles.addBtnText}>Add titles from library</Text>
+        <Text style={styles.addBtnText}>{t('listDetail.addTitles')}</Text>
       </Pressable>
 
       <FlatList
@@ -67,7 +69,7 @@ export default function ListDetail() {
         ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
         ListEmptyComponent={() => (
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>This list is empty. Open any title and tap “Add to lists.”</Text>
+            <Text style={styles.emptyText}>{t('listDetail.empty')}</Text>
           </View>
         )}
         renderItem={({ item }) => (

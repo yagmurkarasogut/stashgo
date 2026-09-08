@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api, Discovery, LibraryEntry } from '@/src/api/client';
 import { useAuth } from '@/src/context/AuthContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 const PLATFORM_ICON: Record<string, any> = {
@@ -22,6 +23,7 @@ const PLATFORM_ICON: Record<string, any> = {
 export default function Home() {
   const { user } = useAuth();
   const router = useRouter();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [discoveries, setDiscoveries] = useState<Discovery[]>([]);
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
@@ -59,26 +61,26 @@ export default function Home() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Welcome back</Text>
+            <Text style={styles.greeting}>{t('home.welcomeBack')}</Text>
             <Text style={styles.name}>{user?.name || user?.email?.split('@')[0]}</Text>
           </View>
           <View style={styles.stats}>
-            <View style={styles.statPill}><Text style={styles.statNum}>{library.length}</Text><Text style={styles.statLabel}>in vault</Text></View>
+            <View style={styles.statPill}><Text style={styles.statNum}>{library.length}</Text><Text style={styles.statLabel}>{t('home.inVault')}</Text></View>
           </View>
         </View>
 
         {/* Hero recent library carousel */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Your vault</Text>
+            <Text style={styles.sectionTitle}>{t('home.yourVault')}</Text>
             <Pressable testID="home-see-all-library" onPress={() => router.push('/(tabs)/library')}>
-              <Text style={styles.link}>See all →</Text>
+              <Text style={styles.link}>{t('home.seeAll')}</Text>
             </Pressable>
           </View>
           {loading ? (
             <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.lg }} />
           ) : recentPosters.length === 0 ? (
-            <EmptyHint text="Your memory vault is empty. Tap + to save your first discovery." />
+            <EmptyHint text={t('home.vaultEmpty')} />
           ) : (
             <FlatList
               horizontal
@@ -115,11 +117,11 @@ export default function Home() {
         {/* Recent discoveries */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Recent discoveries</Text>
-            {totalDetections > 0 ? <Text style={styles.badge}>{totalDetections} detected</Text> : null}
+            <Text style={styles.sectionTitle}>{t('home.recentDiscoveries')}</Text>
+            {totalDetections > 0 ? <Text style={styles.badge}>{t('home.detected', { n: totalDetections })}</Text> : null}
           </View>
           {loading ? null : discoveries.length === 0 ? (
-            <EmptyHint text="No discoveries yet. Paste a Reel, TikTok, YouTube Short, or article URL below." />
+            <EmptyHint text={t('home.noDiscoveries')} />
           ) : (
             <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
               {discoveries.slice(0, 8).map((d) => (
@@ -153,6 +155,7 @@ function EmptyHint({ text }: { text: string }) {
 
 function DiscoveryCard({ d }: { d: Discovery }) {
   const router = useRouter();
+  const t = useT();
   const icon = PLATFORM_ICON[d.source_platform] || 'globe-outline';
   return (
     <Pressable
@@ -182,13 +185,13 @@ function DiscoveryCard({ d }: { d: Discovery }) {
               ) : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.detChipTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.detChipMeta}>{item.media_type} · {(item.confidence * 100).toFixed(0)}%</Text>
+                <Text style={styles.detChipMeta}>{t(`mediaType.${item.media_type}`)} · {(item.confidence * 100).toFixed(0)}%</Text>
               </View>
             </View>
           )}
         />
       ) : (
-        <Text style={styles.discNone}>No movies detected</Text>
+        <Text style={styles.discNone}>{t('home.noMoviesDetected')}</Text>
       )}
     </Pressable>
   );

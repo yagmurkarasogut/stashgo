@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry, CustomList } from '@/src/api/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 // Dual-purpose: create a new list (default) OR add titles to an existing list (?listId=)
@@ -13,6 +14,7 @@ export default function ListNew() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const t = useT();
   const { listId, listName } = useLocalSearchParams<{ listId?: string; listName?: string }>();
   const addMode = !!listId;
 
@@ -50,22 +52,22 @@ export default function ListNew() {
   const submit = async () => {
     const ids = Array.from(selected);
     if (addMode) {
-      if (ids.length === 0) { toast.show('Select at least one title', 'info'); return; }
+      if (ids.length === 0) { toast.show(t('listNew.selectOne'), 'info'); return; }
       setBusy(true);
       try {
         await api.post(`/collections/${listId}/items/batch`, { entry_ids: ids });
-        toast.show(`Added ${ids.length} to "${listName || 'list'}"`, 'success');
+        toast.show(t('listNew.added', { n: ids.length, name: listName || t('listDetail.fallback') }), 'success');
         router.back();
-      } catch (e) { toast.show('Could not add titles', 'error'); }
+      } catch (e) { toast.show(t('listNew.couldNotAdd'), 'error'); }
       finally { setBusy(false); }
     } else {
-      if (!name.trim()) { toast.show('Name your list first', 'info'); return; }
+      if (!name.trim()) { toast.show(t('listNew.nameFirst'), 'info'); return; }
       setBusy(true);
       try {
         const c = await api.post<CustomList>('/collections', { name: name.trim(), entry_ids: ids });
-        toast.show(`Created "${c.name}" with ${ids.length} title(s)`, 'success');
+        toast.show(t('listNew.created', { name: c.name, n: ids.length }), 'success');
         router.replace(`/list/${c.collection_id}`);
-      } catch (e) { toast.show('Could not create list', 'error'); }
+      } catch (e) { toast.show(t('listNew.couldNotCreate'), 'error'); }
       finally { setBusy(false); }
     }
   };
@@ -79,7 +81,7 @@ export default function ListNew() {
         <Pressable testID="list-new-close" onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={colors.onSurface} />
         </Pressable>
-        <Text style={styles.title}>{addMode ? `Add to ${listName || 'list'}` : 'Create New List'}</Text>
+        <Text style={styles.title}>{addMode ? t('listNew.addTo', { name: listName || t('listDetail.fallback') }) : t('listNew.createNew')}</Text>
         <View style={{ width: 26 }} />
       </View>
 
@@ -90,7 +92,7 @@ export default function ListNew() {
               testID="list-new-name"
               value={name}
               onChangeText={setName}
-              placeholder="List name — e.g. Best Horror, Nolan Collection"
+              placeholder={t('listNew.namePlaceholder')}
               placeholderTextColor={colors.onSurfaceTertiary}
               style={styles.nameInput}
             />
@@ -103,13 +105,13 @@ export default function ListNew() {
             testID="list-new-search"
             value={search}
             onChangeText={setSearch}
-            placeholder="Search your library"
+            placeholder={t('listNew.searchLibrary')}
             placeholderTextColor={colors.onSurfaceTertiary}
             style={styles.searchInput}
           />
         </View>
 
-        <Text style={styles.helper}>Select titles from your library to include</Text>
+        <Text style={styles.helper}>{t('listNew.helper')}</Text>
 
         {loading ? (
           <ActivityIndicator color={colors.brand} style={{ marginTop: spacing.xl }} />
@@ -119,7 +121,7 @@ export default function ListNew() {
             keyExtractor={(i) => i.entry_id}
             contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120, gap: spacing.sm }}
             ListEmptyComponent={() => (
-              <Text style={styles.emptyText}>Your library is empty. Add discoveries first, then build lists.</Text>
+              <Text style={styles.emptyText}>{t('listNew.libEmpty')}</Text>
             )}
             renderItem={({ item }) => {
               const isExisting = existing.has(item.entry_id);
@@ -134,7 +136,7 @@ export default function ListNew() {
                   <Image source={{ uri: item.poster_url || IMAGES.posterFallback }} style={styles.poster} contentFit="cover" />
                   <View style={{ flex: 1, marginLeft: spacing.md }}>
                     <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.rowMeta}>{item.media_type.toUpperCase()} {item.year ? `· ${item.year}` : ''}</Text>
+                    <Text style={styles.rowMeta}>{t(`mediaType.${item.media_type}`)} {item.year ? `· ${item.year}` : ''}</Text>
                   </View>
                   <Ionicons
                     name={isSel ? 'checkmark-circle' : 'ellipse-outline'}
@@ -151,7 +153,7 @@ export default function ListNew() {
           <Pressable testID="list-new-submit" onPress={submit} disabled={busy} style={[styles.submit, busy && { opacity: 0.7 }]}>
             {busy ? <ActivityIndicator color={colors.onBrand} /> : (
               <Text style={styles.submitText}>
-                {addMode ? `Add ${count} title${count === 1 ? '' : 's'}` : `Create list${count ? ` · ${count} selected` : ''}`}
+                {addMode ? t('listNew.addN', { n: count }) : t('listNew.createWithCount', { sel: count ? t('listNew.selected', { n: count }) : '' })}
               </Text>
             )}
           </Pressable>

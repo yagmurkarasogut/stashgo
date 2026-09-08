@@ -101,3 +101,108 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  TRACE production-readiness (scope freeze). This iteration: complete TR/EN localization,
+  new auth account flows (change password, forgot/reset via email, real account deletion,
+  admin role), Settings screen, legal pages. Do not break existing Trace features.
+
+backend:
+  - task: "Auth: change password"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/auth/change-password verifies current pw, updates hash, revokes sessions. curl-verified old pw rejected."
+  - task: "Auth: forgot/reset password via email (Emergent Resend)"
+    implemented: true
+    working: true
+    file: "backend/server.py, backend/services/email.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/auth/forgot-password (non-enumerating, emails 6-digit code, 15min expiry, bcrypt-hashed) + POST /api/auth/reset-password (verifies code, updates pw, revokes sessions). Email delivery verified via delivered@resend.dev (id returned). Wrong code -> 400."
+  - task: "Auth: real account deletion (KVKK)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "DELETE /api/auth/account soft-deletes+anonymizes PII, purges library/lists/discoveries, revokes sessions. Login blocked after; email freed for re-register. curl-verified."
+  - task: "Admin role field + seed"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "users.role added (default user). Startup seeds admin for yagmurkarasogut@gmail.com. UserPublic returns role."
+
+frontend:
+  - task: "Centralized TR/EN i18n across all screens"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/i18n/*, all screens"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "I18nProvider (device-locale default, persisted). Localized: tabs, login, register, onboarding (exact provided TR copy), home, library, lists, search, profile, settings, add-discovery, movie detail, list detail, list new. Needs QA that switching to TR leaves no English on these screens."
+  - task: "Settings screen + Forgot password + Legal pages"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/settings.tsx, (auth)/forgot.tsx, legal/[doc].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Settings: language, change password, legal links, delete-account (exact TR confirm copy). Forgot: 2-step email->code+newpass. Legal: bilingual Terms + Privacy/KVKK screens."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 9
+
+test_plan:
+  current_focus:
+    - "Auth: forgot/reset password via email (Emergent Resend)"
+    - "Auth: real account deletion (KVKK)"
+    - "Centralized TR/EN i18n across all screens"
+    - "Settings screen + Forgot password + Legal pages"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Please regression-test existing Trace flows PLUS the new work.
+      BACKEND (high): /api/auth/change-password, /api/auth/forgot-password (returns ok even for
+      unknown email; sends code for real email accounts), /api/auth/reset-password (wrong/expired
+      code -> 400, valid code -> updates pw and revokes sessions), DELETE /api/auth/account (login
+      blocked after deletion, email reusable). Existing: register, login, discoveries analysis+autosave,
+      library filters/sort/genre, collections CRUD + batch add, semantic search.
+      FRONTEND (high): app boots; onboarding shows exact TR copy when language=TR; Settings language
+      toggle switches UI TR/EN with NO leftover English on core screens; change-password from Settings;
+      forgot-password 2-step screen; legal Terms + Privacy/KVKK open; account deletion confirm flow.
+      Note new backend endpoints require no user credentials (Emergent email key already in .env).
+      Test credentials in /app/memory/test_credentials.md.

@@ -7,20 +7,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, Discovery } from '@/src/api/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
 
 type Mode = 'url' | 'text' | 'screenshot';
 
-const MODES: { key: Mode; label: string; icon: any }[] = [
-  { key: 'url', label: 'URL', icon: 'link-outline' },
-  { key: 'text', label: 'Text', icon: 'create-outline' },
-  { key: 'screenshot', label: 'Screenshot', icon: 'image-outline' },
+const MODES: { key: Mode; labelKey: string; icon: any }[] = [
+  { key: 'url', labelKey: 'add.modeUrl', icon: 'link-outline' },
+  { key: 'text', labelKey: 'add.modeText', icon: 'create-outline' },
+  { key: 'screenshot', labelKey: 'add.modeScreenshot', icon: 'image-outline' },
 ];
 
 export default function AddDiscovery() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const t = useT();
   const params = useLocalSearchParams<{ shared_url?: string; autostart?: string }>();
   const [mode, setMode] = useState<Mode>('url');
   const [url, setUrl] = useState('');
@@ -36,7 +38,7 @@ export default function AddDiscovery() {
 
   const pickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { setErr('Media library permission required'); return; }
+    if (!perm.granted) { setErr(t('add.errPerm')); return; }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       base64: true,
@@ -56,13 +58,14 @@ export default function AddDiscovery() {
       const n = res.saved_count ?? res.detections.filter((d) => d.saved).length;
       if (n > 0) {
         const names = res.detections.filter((d) => d.saved).map((d) => d.title).slice(0, 2).join(', ');
-        toast.show(`Saved to library: ${names}${n > 2 ? ` +${n - 2} more` : ''}`, 'success');
+        const more = n > 2 ? t('add.moreCount', { n: n - 2 }) : '';
+        toast.show(t('add.savedToast', { names, more }), 'success');
       } else {
-        toast.show('Analyzed — no confident match found', 'info');
+        toast.show(t('add.noMatchToast'), 'info');
       }
     } catch (e: any) {
-      setErr(e?.detail || 'Failed to analyze');
-      toast.show('Analysis failed', 'error');
+      setErr(e?.detail || t('add.errFail'));
+      toast.show(t('add.failToast'), 'error');
     } finally {
       setBusy(false);
     }
@@ -72,13 +75,13 @@ export default function AddDiscovery() {
     setErr('');
     let body: any = { kind: mode };
     if (mode === 'url') {
-      if (!url.trim()) { setErr('Paste a URL'); return; }
+      if (!url.trim()) { setErr(t('add.errPasteUrl')); return; }
       body.url = url.trim();
     } else if (mode === 'text') {
-      if (!text.trim()) { setErr('Enter some text'); return; }
+      if (!text.trim()) { setErr(t('add.errEnterText')); return; }
       body.text = text.trim();
     } else {
-      if (!imageBase64) { setErr('Pick a screenshot'); return; }
+      if (!imageBase64) { setErr(t('add.errPickShot')); return; }
       body.image_base64 = imageBase64;
       body.image_mime = 'image/jpeg';
     }
@@ -108,10 +111,10 @@ export default function AddDiscovery() {
         discovery_id: result?.discovery_id,
       });
       setSaved(new Set([...saved, groupKey]));
-      toast.show(`Saved "${cand.title}" to library`, 'success');
+      toast.show(t('add.savedOne', { title: cand.title }), 'success');
     } catch (e) {
       console.warn('save failed', e);
-      toast.show('Could not save', 'error');
+      toast.show(t('add.couldNotSave'), 'error');
     } finally {
       setSaving(null);
     }
@@ -120,7 +123,7 @@ export default function AddDiscovery() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]} testID="add-discovery-screen">
       <View style={styles.head}>
-        <Text style={styles.title}>Add discovery</Text>
+        <Text style={styles.title}>{t('add.title')}</Text>
         <Pressable testID="add-close-button" onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="close" size={26} color={colors.onSurface} />
         </Pressable>
@@ -141,7 +144,7 @@ export default function AddDiscovery() {
                       style={[styles.modeChip, active && styles.modeChipActive]}
                     >
                       <Ionicons name={m.icon} size={14} color={active ? colors.brand : colors.onSurfaceTertiary} />
-                      <Text style={[styles.modeText, active && { color: colors.brand }]}>{m.label}</Text>
+                      <Text style={[styles.modeText, active && { color: colors.brand }]}>{t(m.labelKey)}</Text>
                     </Pressable>
                   );
                 })}
@@ -151,7 +154,7 @@ export default function AddDiscovery() {
                 {mode === 'url' && (
                   <TextInput
                     testID="add-url-input"
-                    placeholder="Paste Reels / TikTok / YouTube / article URL"
+                    placeholder={t('add.urlPlaceholder')}
                     placeholderTextColor={colors.onSurfaceTertiary}
                     value={url}
                     onChangeText={setUrl}
@@ -163,7 +166,7 @@ export default function AddDiscovery() {
                 {mode === 'text' && (
                   <TextInput
                     testID="add-text-input"
-                    placeholder="Paste a caption, tweet, or paragraph…"
+                    placeholder={t('add.textPlaceholder')}
                     placeholderTextColor={colors.onSurfaceTertiary}
                     value={text}
                     onChangeText={setText}
@@ -178,7 +181,7 @@ export default function AddDiscovery() {
                     ) : (
                       <>
                         <Ionicons name="cloud-upload-outline" size={40} color={colors.brand} />
-                        <Text style={styles.pickerText}>Tap to choose a screenshot</Text>
+                        <Text style={styles.pickerText}>{t('add.pickImage')}</Text>
                       </>
                     )}
                   </Pressable>
@@ -191,12 +194,12 @@ export default function AddDiscovery() {
                 {busy ? (
                   <>
                     <ActivityIndicator color={colors.onBrand} />
-                    <Text style={styles.submitText}>Analyzing with AI…</Text>
+                    <Text style={styles.submitText}>{t('add.analyzing')}</Text>
                   </>
                 ) : (
                   <>
                     <Ionicons name="sparkles" size={16} color={colors.onBrand} />
-                    <Text style={styles.submitText}>Analyze</Text>
+                    <Text style={styles.submitText}>{t('add.analyze')}</Text>
                   </>
                 )}
               </Pressable>
@@ -207,20 +210,20 @@ export default function AddDiscovery() {
                 <View style={styles.savedBanner} testID="add-saved-banner">
                   <Ionicons name="checkmark-circle" size={18} color={colors.success} />
                   <Text style={styles.savedBannerText}>
-                    Auto-saved {result.saved_count ?? result.detections.filter((d) => d.saved).length} title(s) to your library
+                    {t('add.autoSaved', { n: result.saved_count ?? result.detections.filter((d) => d.saved).length })}
                   </Text>
                 </View>
               ) : null}
 
-              <Text style={styles.resultTitle}>AI Summary</Text>
+              <Text style={styles.resultTitle}>{t('add.aiSummary')}</Text>
               <Text style={styles.summary}>{result.ai_summary || '—'}</Text>
               {result.caption ? <Text style={styles.caption}>{`“${result.caption}”`}</Text> : null}
 
               <Text style={[styles.resultTitle, { marginTop: spacing.xl }]}>
-                Detected {result.detections.length > 0 ? `(${result.detections.length})` : ''}
+                {t('add.detected')} {result.detections.length > 0 ? `(${result.detections.length})` : ''}
               </Text>
               {result.detections.length === 0 ? (
-                <Text style={styles.noneDetected}>{`No movies or TV shows detected — Trace won't guess when it isn't sure.`}</Text>
+                <Text style={styles.noneDetected}>{t('add.none')}</Text>
               ) : (
                 result.detections.map((d, i) => {
                   const candidates = [
@@ -240,11 +243,11 @@ export default function AddDiscovery() {
                       <Image source={{ uri: chosen.poster_url || IMAGES.posterFallback }} style={styles.detPoster} contentFit="cover" />
                       <View style={{ flex: 1, padding: spacing.md }}>
                         <Text style={styles.detTitle}>{chosen.title}</Text>
-                        <Text style={styles.detMeta}>{chosen.media_type.toUpperCase()} {chosen.year ? `· ${chosen.year}` : ''} · {(chosen.confidence * 100).toFixed(0)}% match</Text>
+                        <Text style={styles.detMeta}>{t(`mediaType.${chosen.media_type}`)} {chosen.year ? `· ${chosen.year}` : ''} · {t('add.matchPct', { n: (chosen.confidence * 100).toFixed(0) })}</Text>
                         {lowConf ? (
                           <View style={styles.lowConfBadge}>
                             <Ionicons name="help-circle-outline" size={12} color={colors.warning} />
-                            <Text style={styles.lowConfText}>Not fully sure — pick the right one below</Text>
+                            <Text style={styles.lowConfText}>{t('add.lowConf')}</Text>
                           </View>
                         ) : null}
                         {d.reason ? <Text style={styles.detReason} numberOfLines={2}>{d.reason}</Text> : null}
@@ -268,7 +271,7 @@ export default function AddDiscovery() {
 
                         {isSaved ? (
                           <View style={[styles.saveBtn, { backgroundColor: colors.success }]}>
-                            <Text style={styles.saveBtnText}>✓ In your library</Text>
+                            <Text style={styles.saveBtnText}>{t('add.inLibrary')}</Text>
                           </View>
                         ) : (
                           <Pressable
@@ -278,7 +281,7 @@ export default function AddDiscovery() {
                             style={styles.saveBtn}
                           >
                             {saving === key ? <ActivityIndicator size="small" color={colors.onBrand} /> :
-                              <Text style={styles.saveBtnText}>+ Save this one instead</Text>}
+                              <Text style={styles.saveBtnText}>{t('add.saveInstead')}</Text>}
                           </Pressable>
                         )}
                       </View>
@@ -287,7 +290,7 @@ export default function AddDiscovery() {
                 })
               )}
               <Pressable testID="add-done-button" onPress={() => router.back()} style={[styles.submit, { marginTop: spacing.xl }]}>
-                <Text style={styles.submitText}>Done</Text>
+                <Text style={styles.submitText}>{t('add.done')}</Text>
               </Pressable>
             </View>
           )}

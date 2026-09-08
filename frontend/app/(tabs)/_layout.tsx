@@ -3,8 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { View, StyleSheet, Platform } from 'react-native';
 import { colors } from '@/src/theme';
+import { useT } from '@/src/i18n';
 
 export default function TabsLayout() {
+  const t = useT();
   return (
     <Tabs
       screenOptions={{
@@ -33,7 +35,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarTestID: 'tab-home',
           tabBarIcon: ({ color, size }) => <Ionicons name="film-outline" size={size} color={color} />,
         }}
@@ -41,7 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Library',
+          title: t('tabs.library'),
           tabBarTestID: 'tab-library',
           tabBarIcon: ({ color, size }) => <Ionicons name="albums-outline" size={size} color={color} />,
         }}
@@ -49,7 +51,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="lists"
         options={{
-          title: 'Lists',
+          title: t('tabs.lists'),
           tabBarTestID: 'tab-lists',
           tabBarIcon: ({ color, size }) => <Ionicons name="list-outline" size={size} color={color} />,
         }}
@@ -57,7 +59,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
+          title: t('tabs.search'),
           tabBarTestID: 'tab-search',
           tabBarIcon: ({ color, size }) => <Ionicons name="sparkles-outline" size={size} color={color} />,
         }}
@@ -65,7 +67,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarTestID: 'tab-profile',
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
         }}
