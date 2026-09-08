@@ -2,12 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { colors, spacing, radius } from '@/src/theme';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   return (
     <View style={styles.root} testID="profile-screen">
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + spacing.lg, paddingBottom: 120 }}>
@@ -29,6 +31,11 @@ export default function Profile() {
           <View style={styles.row}><Text style={styles.rowKey}>Data enrichment</Text><Text style={styles.rowVal}>TMDB (mock)</Text></View>
           <View style={styles.row}><Text style={styles.rowKey}>AI engine</Text><Text style={styles.rowVal}>Gemini 3 Flash</Text></View>
         </View>
+
+        <Pressable testID="profile-settings-button" onPress={() => router.push('/settings')} style={({ pressed }) => [styles.logout, { borderColor: colors.border, marginBottom: spacing.md }, pressed && { opacity: 0.8 }]}>
+          <Ionicons name="settings-outline" size={18} color={colors.brand} />
+          <Text style={[styles.logoutText, { color: colors.brand }]}>Settings & Privacy</Text>
+        </Pressable>
 
         <Pressable testID="profile-logout-button" onPress={logout} style={({ pressed }) => [styles.logout, pressed && { opacity: 0.8 }]}>
           <Ionicons name="log-out-outline" size={18} color={colors.error} />

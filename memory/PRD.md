@@ -73,3 +73,42 @@ Build the complete backend architecture and product foundation for **Loom**, an 
 - **Prod login/registration "Registration failed":** Reproduced the exact payload against backend logic in preview → 200 OK (register + login), so backend/DB/validation are correct. Symptom = client fallback shown when the thrown error has no `detail` → the deployed build could not reach the backend (empty/incorrect `EXPO_PUBLIC_BACKEND_URL` baked at Metro build time). Preview and production use SEPARATE DBs (preview-only accounts 401 in prod by design).
   - Client hardening shipped in `src/api/client.ts`: explicit `ApiError` on network/fetch failure (includes target URL), explicit error when `EXPO_PUBLIC_BACKEND_URL` is empty, readable handling of array (422) `detail`. Verified by testing_agent (iteration_5) — no regression; wrong password now shows "Invalid credentials".
   - Action: dispatched deployer to verify the LITERAL baked backend URL and re-bake `EXPO_PUBLIC_BACKEND_URL=https://media-vault-api.emergent.host` if wrong. User must **redeploy** to re-bundle, then use a **production-registered** account.
+
+
+## PRODUCTION-READY BRIEF — Progress Log
+
+### PHASE 1 (done): Architecture analysis reported to user.
+Stack: Expo Router FE (fetch+useState, no react-query), FastAPI `/api`, MongoDB
+(users, user_sessions, discoveries, library, collections). Auth: email/pw (bcrypt +
+7-day session token) + Emergent Google. Gaps: no i18n, no admin/role, no analytics,
+no ads CRM, no account deletion, no legal pages, no Nostr.
+
+### Grup A — Store-blocker foundations (IN PROGRESS)
+Done & tested this turn:
+- Backend (additive, backward-compatible in server.py):
+  - `users.role` field (default "user"); admin seeded on startup for
+    yagmurkarasogut@gmail.com (idempotent).
+  - `UserPublic.role` + `_to_public` now returns role.
+  - `POST /api/auth/change-password` (auth'd; verifies current pw).
+  - `DELETE /api/auth/account` — soft delete: sets deleted_at, anonymizes PII,
+    frees email for re-registration, invalidates sessions.
+  - login + get_current_user reject users with `deleted_at`.
+  - curl-verified: change-pw (old pw 401), delete (login 401 after), re-register 200.
+- Frontend:
+  - `app/settings.tsx` (new) — language toggle (EN/TR, persisted via storage),
+    change password, legal links (ToS, Privacy/KVKK), delete account w/ confirm.
+  - Profile → Settings link (testID profile-settings-button); route registered in _layout.
+  - Screenshot-verified render + TR toggle.
+
+Deferred to next turns (reported to user):
+- Full i18n rollout across ALL screens (only Settings localized so far).
+- Email-based password reset (needs Emergent Resend integration → integration_expert first).
+- First-launch language prompt.
+- Legal pages actual content/screens (currently placeholder links).
+- Then Grup B (analytics/rating/genres), Grup C (admin+ads CRM), Grup D, Grup E (Nostr).
+
+### VPN/network (Madge 2) — pending deeper RCA
+Backend externally healthy (health/register 200, valid SSL, CORS *). User reports
+their specific phone needs VPN though others don't. Next: deployer-agent RCA covering
+DNS/IPv4-IPv6/SSL/firewall + confirm prod build never bakes preview URL.
+

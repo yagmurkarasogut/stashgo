@@ -75,6 +75,7 @@ class UserPublic(BaseModel):
     name: Optional[str] = None
     picture: Optional[str] = None
     auth_provider: str
+    role: str = "user"
     created_at: datetime
 
 
@@ -206,6 +207,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Dict:
     user = await db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.get("deleted_at"):
+        raise HTTPException(status_code=401, detail="Account deleted")
     return user
 
 
@@ -216,6 +219,7 @@ def _to_public(user: Dict) -> Dict:
         "name": user.get("name"),
         "picture": user.get("picture"),
         "auth_provider": user.get("auth_provider", "email"),
+        "role": user.get("role", "user"),
         "created_at": user["created_at"],
     }
 
@@ -235,6 +239,7 @@ async def register(body: UserRegister):
         "picture": None,
         "password_hash": pw_hash,
         "auth_provider": "email",
+        "role": "user",
         "created_at": now_utc(),
     }
     await db.users.insert_one(user_doc)
@@ -245,7 +250,7 @@ async def register(body: UserRegister):
 @api.post("/auth/login", response_model=AuthResponse)
 async def login(body: UserLogin):
     user = await db.users.find_one({"email": body.email.lower()}, {"_id": 0})
-    if not user or not user.get("password_hash"):
+    if not user or not user.get("password_hash") or user.get("deleted_at"):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not bcrypt.checkpw(body.password.encode(), user["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -300,6 +305,50 @@ async def google_session(body: GoogleSessionBody):
 
     token = await create_session(user_id)
     return {"session_token": token, "user": _to_public(user)}
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6, max_length=200)
+
+
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordBody, user=Depends(get_current_user)):
+    full = await db.users.find_one({"user_id": user["user_id"]})
+    if not full or not full.get("password_hash"):
+        raise HTTPException(status_code=400, detail="Password change not available for this account")
+    if not bcrypt.checkpw(body.current_password.encode(), full["password_hash"].encode()):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    new_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"password_hash": new_hash}})
+    # invalidate all other sessions for safety
+    await db.user_sessions.delete_many({"user_id": user["user_id"]})
+    token = await create_session(user["user_id"])
+    return {"ok": True, "session_token": token}
+
+
+@api.delete("/auth/account")
+async def delete_account(user=Depends(get_current_user)):
+    """KVKK/Store-compliant account deletion: soft-delete + anonymize PII, purge
+    the user's personal content, and revoke all sessions. Aggregate/analytics data
+    (not tied to PII) may be retained separately in future."""
+    uid = user["user_id"]
+    await db.users.update_one(
+        {"user_id": uid},
+        {"$set": {
+            "deleted_at": now_utc(),
+            "email": f"deleted_{uid}@trace.deleted",
+            "name": "Deleted user",
+            "picture": None,
+            "password_hash": None,
+        }},
+    )
+    # remove the user's personal content
+    await db.user_sessions.delete_many({"user_id": uid})
+    await db.discoveries.delete_many({"user_id": uid})
+    await db.library.delete_many({"user_id": uid})
+    await db.collections.delete_many({"user_id": uid})
+    return {"ok": True}
 
 
 @api.get("/auth/me", response_model=UserPublic)
@@ -795,6 +844,9 @@ async def on_startup():
     await db.discoveries.create_index([("user_id", 1), ("created_at", -1)])
     await db.library.create_index([("user_id", 1), ("tmdb_id", 1), ("media_type", 1)], unique=True)
     await db.collections.create_index([("user_id", 1), ("created_at", -1)])
+    # Seed the initial admin role (idempotent; safe on existing data).
+    admin_email = os.environ.get("ADMIN_EMAIL", "yagmurkarasogut@gmail.com").lower()
+    await db.users.update_one({"email": admin_email}, {"$set": {"role": "admin"}})
     logger.info("Trace API ready. TMDB mocked=%s", tmdb_svc.is_mocked())
 
 
