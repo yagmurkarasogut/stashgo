@@ -526,9 +526,8 @@ async def _upsert_library_entry(user_id: str, info: Dict, discovery_id: Optional
 # minimum confidence for a detection to be auto-saved to the library
 AUTO_SAVE_THRESHOLD = 0.5
 
-# Free tier: 5 AI analyses per calendar day. Premium (verified store entitlement,
-# reported by the client from RevenueCat) is unlimited. Entitlement source of truth is
-# the RevenueCat SDK on the client; backend only counts usage for the free cap.
+# Free tier: 5 AI credits per calendar day. Recommend/ask = 2 credits, analysis = 1 credit.
+# Premium (verified store entitlement, reported by client from RevenueCat) is unlimited.
 FREE_AI_DAILY_LIMIT = 5
 
 
@@ -536,25 +535,25 @@ def _is_premium_request(request: Request) -> bool:
     return request.headers.get("x-premium", "").lower() in ("1", "true", "yes")
 
 
-async def _ai_usage_today(user_id: str) -> int:
+async def _ai_credits_today(user_id: str) -> int:
     day = now_utc().strftime("%Y-%m-%d")
     doc = await db.ai_usage.find_one({"user_id": user_id, "day": day})
-    return doc["count"] if doc else 0
+    return doc.get("credits", 0) if doc else 0
 
 
-async def _check_ai_quota(user: Dict, request: Request) -> None:
+async def _check_ai_quota(user: Dict, request: Request, cost: int = 1) -> None:
     if _is_premium_request(request):
         return
     day = now_utc().strftime("%Y-%m-%d")
-    used = await _ai_usage_today(user["user_id"])
-    if used >= FREE_AI_DAILY_LIMIT:
+    used = await _ai_credits_today(user["user_id"])
+    if used + cost > FREE_AI_DAILY_LIMIT:
         raise HTTPException(
             status_code=402,
-            detail="You've reached today's free limit of 5 AI analyses. Upgrade to Stash Go Premium for unlimited.",
+            detail="You've reached today's free AI limit. Upgrade to Stash Go Premium for unlimited.",
         )
     await db.ai_usage.update_one(
         {"user_id": user["user_id"], "day": day},
-        {"$inc": {"count": 1}, "$setOnInsert": {"created_at": now_utc()}},
+        {"$inc": {"credits": cost}, "$setOnInsert": {"created_at": now_utc()}},
         upsert=True,
     )
 
@@ -562,7 +561,7 @@ async def _check_ai_quota(user: Dict, request: Request) -> None:
 @api.get("/ai/usage")
 async def ai_usage(request: Request, user=Depends(get_current_user)):
     premium = _is_premium_request(request)
-    used = await _ai_usage_today(user["user_id"])
+    used = await _ai_credits_today(user["user_id"])
     return {
         "premium": premium,
         "limit": FREE_AI_DAILY_LIMIT,
@@ -574,7 +573,7 @@ async def ai_usage(request: Request, user=Depends(get_current_user)):
 
 @api.post("/discoveries", response_model=Discovery)
 async def create_discovery(body: DiscoveryCreate, request: Request, user=Depends(get_current_user)):
-    await _check_ai_quota(user, request)
+    await _check_ai_quota(user, request, cost=1)
     if body.kind == "url":
         if not body.url:
             raise HTTPException(status_code=400, detail="url required")
@@ -932,7 +931,7 @@ async def ai_discover(body: AiDiscoverBody, request: Request, user=Depends(get_c
     q = (body.query or "").strip()
     if not q:
         raise HTTPException(status_code=400, detail="Ask something first")
-    await _check_ai_quota(user, request)
+    await _check_ai_quota(user, request, cost=2)
     try:
         out = await ai_pipeline.discover_from_clue(q)
     except Exception:

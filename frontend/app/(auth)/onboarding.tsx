@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,7 +78,7 @@ export default function Onboarding() {
       <LinearGradient colors={['#12100B', '#0B0D10', '#0B0D10']} style={StyleSheet.absoluteFillObject} />
 
       <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]}>
-        <Image source={IMAGES.logo} style={styles.brandLogo} contentFit="contain" />
+        <View />
         <Pressable testID="onboarding-skip" onPress={goRegister} hitSlop={12}>
           <Text style={styles.skip}>{t('onboarding.skip')}</Text>
         </Pressable>

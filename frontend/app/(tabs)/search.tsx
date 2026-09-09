@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, LibraryEntry } from '@/src/api/client';
 import { useT } from '@/src/i18n';
-import { colors, spacing, radius, IMAGES } from '@/src/theme';
-
-type Match = LibraryEntry & { match_reason?: string; match_score?: number };
+import { colors, spacing, radius } from '@/src/theme';
 
 const SUGGESTION_KEYS = ['search.s1', 'search.s2', 'search.s3', 'search.s4'];
 
@@ -17,24 +13,12 @@ export default function Search() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
-  const [results, setResults] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [ran, setRan] = useState(false);
 
-  const run = async (query?: string) => {
+  const run = (query?: string) => {
     const query2 = (query ?? q).trim();
     if (!query2) return;
-    setQ(query2);
-    setLoading(true); setRan(true);
-    try {
-      const res = await api.post<{ query: string; results: Match[] }>('/search', { query: query2 });
-      setResults(res.results);
-    } catch (e) {
-      console.warn('search failed', e);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+    // Ara uses the SAME general AI intelligence as "Stash Go'ya sor".
+    router.push({ pathname: '/ai-discover', params: { q: query2 } });
   };
 
   return (
@@ -66,36 +50,6 @@ export default function Search() {
               <Text style={styles.scanning}>{t('search.scanning')}</Text>
             </View>
           )}
-
-          {ran && !loading && results.length === 0 && (
-            <View style={styles.emptyResults}>
-              <Ionicons name="search-outline" size={40} color={colors.onSurfaceTertiary} />
-              <Text style={styles.emptyText}>{t('search.noMatches')}</Text>
-            </View>
-          )}
-
-          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, marginTop: spacing.md }}>
-            {results.map((r) => (
-              <Pressable
-                key={r.entry_id}
-                testID={`search-result-${r.entry_id}`}
-                onPress={() => router.push(`/movie/${r.entry_id}`)}
-                style={styles.resultCard}
-              >
-                <Image source={{ uri: r.poster_url || IMAGES.posterFallback }} style={styles.resultImg} contentFit="cover" />
-                <View style={styles.resultBody}>
-                  <Text style={styles.resultTitle} numberOfLines={1}>{r.title}</Text>
-                  <Text style={styles.resultMeta}>{t(`mediaType.${r.media_type}`)} {r.year ? `· ${r.year}` : ''} {r.director ? `· ${r.director}` : ''}</Text>
-                  {r.match_reason ? (
-                    <View style={styles.reasonPill}>
-                      <Ionicons name="sparkles" size={11} color={colors.brand} />
-                      <Text style={styles.reasonText} numberOfLines={2}>{r.match_reason}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              </Pressable>
-            ))}
-          </View>
         </ScrollView>
 
         <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 }]}>

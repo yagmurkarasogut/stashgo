@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, FlatList, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,15 +29,18 @@ export default function Home() {
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [usage, setUsage] = useState<{ used: number; limit: number; unlimited: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [ds, lib] = await Promise.all([
+      const [ds, lib, use] = await Promise.all([
         api.get<Discovery[]>('/discoveries?limit=20'),
         api.get<LibraryEntry[]>('/library'),
+        api.get<{ used: number; limit: number; unlimited: boolean }>('/ai/usage').catch(() => null),
       ]);
       setDiscoveries(ds);
       setLibrary(lib);
+      if (use) setUsage(use);
     } catch (e) {
       console.warn('home load failed', e);
     } finally {
@@ -46,7 +49,8 @@ export default function Home() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Refresh whenever Home regains focus so counts/state stay in sync after saves/removes.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = () => { setRefreshing(true); load(); };
 
@@ -79,7 +83,15 @@ export default function Home() {
               <Text style={styles.aiTitle}>{t('home.aiTitle')}</Text>
               <Text style={styles.aiPrompt} numberOfLines={1}>{t('home.aiPrompt')}</Text>
             </View>
-            <Ionicons name="arrow-forward" size={18} color={colors.onSurfaceTertiary} />
+            {usage ? (
+              <View style={styles.creditPill} testID="home-ai-credits">
+                <Text style={styles.creditText} numberOfLines={1}>
+                  {usage.unlimited ? t('home.creditsPremium') : t('home.credits', { n: Math.max(0, usage.limit - usage.used), max: usage.limit })}
+                </Text>
+              </View>
+            ) : (
+              <Ionicons name="arrow-forward" size={18} color={colors.onSurfaceTertiary} />
+            )}
           </Pressable>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.aiChipRow}>
             {['discover.c1', 'discover.c3', 'discover.c4', 'discover.c5'].map((k) => (
@@ -240,6 +252,8 @@ const styles = StyleSheet.create({
   aiChipRow: { gap: spacing.sm, paddingVertical: spacing.md },
   aiChip: { backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 8 },
   aiChipText: { color: colors.onSurface, fontSize: 13, fontWeight: '600' },
+  creditPill: { backgroundColor: colors.surfaceTertiary, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 5, maxWidth: 130 },
+  creditText: { color: colors.brand, fontSize: 11, fontWeight: '700' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   sectionTitle: { color: colors.onSurface, fontSize: 18, fontWeight: '600' },
   link: { color: colors.brand, fontSize: 13, fontWeight: '600' },

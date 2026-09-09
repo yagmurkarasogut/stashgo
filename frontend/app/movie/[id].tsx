@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -87,9 +87,20 @@ export default function MovieDetail() {
     update({ user_rating: n });
   };
 
-  const remove = async () => {
+  const doRemove = async () => {
     await api.del(`/library/${id}`);
     router.back();
+  };
+
+  const remove = () => {
+    Alert.alert(
+      t('detail.removeConfirmTitle'),
+      t('detail.removeConfirmBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('detail.remove'), style: 'destructive', onPress: () => { doRemove(); } },
+      ],
+    );
   };
 
   if (loading || !entry) {
