@@ -30,26 +30,17 @@ export default function Search() {
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
-          {!ran && (
-            <View style={styles.suggestBox}>
-              {SUGGESTION_KEYS.map((k) => {
-                const s = t(k);
-                return (
-                  <Pressable key={k} testID={`search-suggest-${k}`} onPress={() => run(s)} style={styles.suggestPill}>
-                    <Ionicons name="sparkles" size={12} color={colors.brand} />
-                    <Text style={styles.suggestText}>{s}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-
-          {loading && (
-            <View style={{ padding: spacing.xxl, alignItems: 'center' }}>
-              <ActivityIndicator color={colors.brand} />
-              <Text style={styles.scanning}>{t('search.scanning')}</Text>
-            </View>
-          )}
+          <View style={styles.suggestBox}>
+            {SUGGESTION_KEYS.map((k) => {
+              const s = t(k);
+              return (
+                <Pressable key={k} testID={`search-suggest-${k}`} onPress={() => run(s)} style={styles.suggestPill}>
+                  <Ionicons name="sparkles" size={12} color={colors.brand} />
+                  <Text style={styles.suggestText}>{s}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
 
         <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 90 }]}>
