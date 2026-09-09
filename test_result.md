@@ -213,3 +213,7 @@ agent_communication:
       NEVER be translated (they come from TMDB) — verify titles look identical in TR and EN.
       Prior iteration_9 (auth flows, i18n, settings, legal) already passed; no need to re-deep-test
       those beyond quick regression. Test credentials in /app/memory/test_credentials.md.
+
+---
+## Iteration 11 (email verification + credit header + premium diagnostic)
+BACKEND email verification: users.email_verified (new email signups=false; missing=treated true for backward-compat & Google). Endpoints: GET /api/auth/verify-email?token= (HTML success/expired/invalid page, curl-verified 200 on valid token -> sets verified), POST /api/auth/resend-verification (non-enumerating). Register now sends verification email + returns email_verified:false. UserPublic exposes email_verified. Frontend: app/(auth)/verify.tsx + AuthGate routes unverified email users to /verify; Google + existing users unaffected. Part2: Home top-right capsule now shows AI credits (tappable->paywall); library count shown next to yourVault title. Part3 diagnostic: see agent report to user.

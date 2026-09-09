@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 12 — Backend + Frontend regression pass for email verification gate & Home AI-credit capsule. BACKEND (14/14 pytest PASS, /app/backend/tests/test_iteration_12.py): (1) POST /api/auth/register returns session_token + user.email_verified=false + auth_provider=email; verification email is enqueued (email_verifications row created). (2) GET /api/auth/me exposes email_verified=false. (3) GET /api/auth/verify-email?token=bogus returns HTML 200 with an 'invalid link' message (non-JSON). (4) POST /api/auth/resend-verification returns {ok:true} for BOTH the known-unverified email AND an unknown/random email (non-enumerating). REGRESSIONS: /api/auth/login works, wrong password → 401; /api/auth/forgot-password returns ok for both known & unknown; /api/auth/reset-password with a bogus code returns 400. AI CREDITS: /api/ai/usage returns limit=5/used/remaining/premium=false/unlimited=false; /api/ai/discover consumes exactly +2 credits per call; /api/discoveries (kind=text) consumes exactly +1 credit; a fresh account hits HTTP 402 on the 3rd ai/discover call (5 free credits → 402 detail 'You've reached today's free AI limit'). FRONTEND (mobile 390x844, all target flows PASS): (1) Register a NEW email/password account via /(auth)/register → app auto-redirects to /verify with testID verify-screen (NOT tabs). Verify screen shows: logo, mail icon, title 'Verify your email', body 'Click the verification link we sent to your email to continue.', the user's email, plus Pressables verify-recheck (\"I've verified, check again\"), verify-resend (\"Resend verification email\"), verify-logout (Sign out). (2) Tapping verify-resend shows the success toast 'Verification email sent.'. (3) Tapping verify-recheck while still unverified keeps the user on /verify (GET /api/auth/me is called, email_verified still false). (4) After flipping email_verified=true in Mongo (db.users) for the test user and logging in again → app lands on /(tabs) home-screen. home-ai-credits capsule (top-right) reads '✨ 5 / 5 AI credits today' and is tappable → opens /paywall (paywall-screen present). home-lib-count is visible next to 'Your library' title and reads '0 titles'. (5) REGRESSION — bottom tabs Home/Library/Lists/Search/Profile all open without crashing (no ReferenceError/TypeError). Tapping the 's1' suggestion on the Search tab correctly navigates to /ai-discover?q=Movie%20about%20time%20travel and ai-discover-screen mounts.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "(Carry-over from iter3–iter11) Deprecated `ImagePicker.MediaTypeOptions.Images` still in use. Reference: /app/frontend/app/add-discovery.tsx:41 — replace with `mediaTypes: ['images']`."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_12.py",
+    "/app/test_reports/pytest/pytest_iter12.xml",
+    "/app/test_reports/iteration_12.json"
+  ],
+  "action_items": [
+    "None blocking for this release pass — email verification gate + Home AI-credit capsule work end-to-end (backend 14/14, frontend 5/5 target scenarios).",
+    "(Carry-over, low priority) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41."
+  ],
+  "critical_code_review_comments": [
+    "backend/server.py:233 register() correctly sets email_verified=False on new email/password accounts and calls _send_verification_email; still returns a session_token so the client can render the /verify gate while allowing GET /api/auth/me. Existing users without the field are treated as verified via _to_public() default (True) — backward-compat OK.",
+    "backend/server.py:488 resend_verification() short-circuits silently for unknown / non-email / already-verified accounts and returns {ok:true} — properly non-enumerating.",
+    "backend/server.py:461 verify_email_link returns HTMLResponse (200) for invalid/expired/valid — matches the review spec of a static HTML success/failure page. Deletes the token row on success.",
+    "frontend/app/_layout.tsx:55 AuthGate gates ONLY email-provider users with email_verified===false — Google/existing users unaffected. Redirects `/verify` on new email/password signups and back to /(tabs) once verified.",
+    "frontend/app/(tabs)/index.tsx:72 home-ai-credits is a Pressable that pushes /paywall — verified. home-lib-count is rendered next to 'Your library' title (line 113). Both testIDs present."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% — 14/14 pytest passed", "frontend": "100% — 5/5 target scenarios pass (register-gate, resend-toast, recheck-stay, home-capsule→paywall, tabs regression + Search→ai-discover)"},
+  "seed_data_creation": "Registered a disposable @gmail.com account (tester+<random>@gmail.com / 123456) and, after the verify-gate assertions, flipped its email_verified=true in Mongo (db.users) to exercise the Home flow. Two additional throwaway registrations were used by the pytest credit-exhaustion test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified testIDs (this iteration): verify-screen, verify-resend, verify-recheck, verify-logout, home-screen, home-ai-credits ('✨ 5 / 5 AI credits today'), home-lib-count ('N titles'), home-ai-entry, paywall-screen, search-screen, search-input, search-submit, search-suggest-search.s1, ai-discover-screen, login-email-input, login-password-input, login-submit-button, register-screen, register-email-input, register-password-input, register-submit-button. To reach Home from a fresh email/password account you MUST flip email_verified=true (Mongo db.users, DB_NAME=test_database). Free AI = 5 credits/day; /api/ai/discover costs 2, /api/discoveries costs 1; 402 emitted on overflow. The web preview does NOT restore session state across separate browser_automation calls — always re-login by filling login-email-input / login-password-input and clicking login-submit-button.",
+  "rca_of_issue": "N/A — no bug reproduced. Feature-verification pass. Reproduction script for the email-verification gate: (1) POST /api/auth/register → user.email_verified=false. (2) Frontend AuthGate (app/_layout.tsx:55) sees user.auth_provider==='email' && email_verified===false and router.replace('/(auth)/verify'). (3) Verify screen calls POST /auth/resend-verification (200 ok:true) and GET /auth/me on recheck. (4) After a valid token verification (curl-checked by main agent) OR a manual DB flip, the same AuthGate observes email_verified===true and router.replace('/(tabs)') on next mount."
+}
