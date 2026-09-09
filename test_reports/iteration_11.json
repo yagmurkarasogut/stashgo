@@ -1,0 +1,31 @@
+{
+  "summary": "Iteration 11 — Frontend-only verification of the Search (Ara) tab crash fix ('ran is not defined' at app/(tabs)/search.tsx:33) and the search→AI unification. Mobile viewport 390x844, fresh accounts registered via /api/auth/register (tester+<ts>@gmail.com / 123456), signed in through the login screen. ALL 4 target scenarios PASS: (1) PRIMARY BUG FIXED — Search tab renders search-screen with the title, exactly 4 suggestion pills (search-suggest-search.s1..s4: 'Movie about time travel', 'Nolan movie with black holes', 'That thriller I saved last month', 'Dark comedy TV shows'), and the input row (search-input + search-submit); body text contains NO 'ran is not defined' / NO 'ReferenceError' and no red-box overlay. (2) SEARCH UNIFICATION — tapping search-suggest-search.s1 navigates to /ai-discover?q=Movie%20about%20time%20travel, ai-discover-screen mounts, and 6 ai-result-<tmdbId> cards render (ai-result-105 Back to the Future, Interstellar, About Time, Edge of Tomorrow, …); typing 'cozy romantic feel good movie 90 minutes' into search-input and pressing search-submit likewise routes to ai-discover-screen and returns 6 ai-result-* cards (Rye Lane, Palm Springs, Before We Go, Safety Not Guaranteed, …). (3) TAB REGRESSION — Home/Library/Lists/Search/Profile all navigate and render with has_error=False (checked body for ReferenceError / TypeError / 'ran is not defined'). (4) HOME AI CREDITS + SAVE — home-ai-credits badge shows '✨ 5 / 5 AI credits today' on a fresh account; on ai-discover, tapping ai-save-1049638 flips the button label from 'Save' → 'Saved' and GET /api/library confirms exactly 1 entry persisted. StashGo logo (transparent, orange play-folder) visible on /login. No red screens; no page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "expo-image-picker", "issue": "(Carry-over from iter3–iter10) Deprecated `ImagePicker.MediaTypeOptions.Images` still in use. Reference: /app/frontend/app/add-discovery.tsx:41 — replace with `mediaTypes: ['images']`."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_11.json"
+  ],
+  "action_items": [
+    "None required for this iteration — the reported crash is fully fixed and search→AI unification works end-to-end.",
+    "(Carry-over, low priority) Replace `ImagePicker.MediaTypeOptions.Images` with `mediaTypes: ['images']` in /app/frontend/app/add-discovery.tsx:41."
+  ],
+  "critical_code_review_comments": [
+    "frontend/app/(tabs)/search.tsx is clean: only useState<'q'> remains, no stale `ran`/`loading`/`results` references. `run()` pushes to /ai-discover with `q` param — matches the shared ai-discover flow expected by tests. Suggestion pills use stable testIDs search-suggest-<i18n-key>, and both onSubmitEditing and the send Pressable call run().",
+    "frontend/app/ai-discover.tsx correctly consumes the `q` route param via useLocalSearchParams and auto-runs, so both suggestion-chip and typed-submit paths from the Search tab produce results without a manual send.",
+    "frontend/app/(tabs)/index.tsx: home-ai-credits pill still renders (verified '5 / 5 AI credits today' on fresh account) and Save persists to /api/library (verified via GET /api/library returning 1 entry after tap)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only requested)", "frontend": "100% — 4/4 target scenarios pass"},
+  "seed_data_creation": "Two disposable @gmail.com accounts registered via /api/auth/register (tester+<random>@gmail.com). One account ended with 1 library entry (tmdb_id 1049638, 'Rye Lane') from tapping ai-save on the first AI result.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Selectors used and verified this iteration: search-screen, search-input, search-submit, search-suggest-search.s1..s4, ai-discover-screen, ai-result-<tmdbId>, ai-save-<tmdbId>, home-screen, home-ai-credits. Login flow: register via `POST /api/auth/register {email,password,name}` then fill inputs on /login (placeholder='Email'/'Password') and click text 'Continue'. NB the Search tab bottom-bar entry is not visible while on /ai-discover — go back (ai-back) or use router.push before clicking 'Search' again. Free AI limit is 5/day/account; each ai-discover call consumes 1 credit, so a single fresh account can exercise ~5 discovery flows before hitting 402 → /paywall.",
+  "rca_of_issue": "Reproduction (pre-fix): opening the Search tab caused the RN-Web LogBox to render a red-box with 'ReferenceError: ran is not defined' from a leftover `{!ran && (…)}` JSX guard at search.tsx:33 after the `ran` state was removed. Post-fix verification: search.tsx now only declares `q` state; the JSX under the ScrollView renders only the suggestion pills unconditionally, and the input bar. Verified: Search tab loads, no red-box, body text does NOT contain 'ran is not defined'/'ReferenceError'. All 5 tabs open cleanly."
+}
