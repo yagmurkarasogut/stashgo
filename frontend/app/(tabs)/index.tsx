@@ -70,7 +70,7 @@ export default function Home() {
           </View>
           <View style={styles.stats}>
             <Pressable testID="home-ai-credits" onPress={() => router.push('/paywall')} style={styles.creditCapsule}>
-              <Text style={styles.creditCapsuleText} numberOfLines={1}>
+              <Text style={styles.creditCapsuleText} numberOfLines={2}>
                 {usage
                   ? (usage.unlimited ? t('home.creditsPremium') : t('home.credits', { n: Math.max(0, usage.limit - usage.used), max: usage.limit }))
                   : '✨ …'}
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   libCount: { color: colors.onSurfaceTertiary, fontSize: 12, fontWeight: '600' },
   creditCapsule: { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 8, maxWidth: 190 },
-  creditCapsuleText: { color: colors.brand, fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
+  creditCapsuleText: { color: colors.brand, fontSize: 12, fontWeight: '800', letterSpacing: 0.3, textAlign: 'center', lineHeight: 16 },
   sectionTitle: { color: colors.onSurface, fontSize: 18, fontWeight: '600' },
   link: { color: colors.brand, fontSize: 13, fontWeight: '600' },
   badge: { color: colors.onSurfaceTertiary, fontSize: 12 },

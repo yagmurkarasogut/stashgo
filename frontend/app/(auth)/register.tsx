@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/context/AuthContext';
 import { useT } from '@/src/i18n';
 import { colors, spacing, radius, IMAGES } from '@/src/theme';
@@ -16,10 +17,12 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [consent, setConsent] = useState(false);
 
   const submit = async () => {
     if (!email || !password) { setErr(t('register.errRequired')); return; }
     if (password.length < 6) { setErr(t('register.errMin')); return; }
+    if (!consent) { setErr(t('register.errConsent')); return; }
     setBusy(true); setErr('');
     try { await register(email.trim(), password, name.trim() || undefined); }
     catch (e: any) { setErr(e?.detail || t('register.errRegFailed')); }
@@ -71,6 +74,10 @@ export default function Register() {
               style={styles.input}
             />
             {err ? <Text style={styles.err} testID="register-error">{err}</Text> : null}
+            <Pressable testID="register-consent" onPress={() => setConsent((v) => !v)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md }}>
+              <Ionicons name={consent ? 'checkbox' : 'square-outline'} size={20} color={consent ? colors.brand : colors.onSurfaceTertiary} />
+              <Text style={{ color: colors.onSurfaceSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{t('register.consent')}</Text>
+            </Pressable>
             <Pressable testID="register-submit-button" onPress={submit} disabled={busy} style={({ pressed }) => [styles.primary, pressed && { opacity: 0.85 }]}>
               {busy ? <ActivityIndicator color={colors.onBrand} /> : <Text style={styles.primaryText}>{t('register.createAccount')}</Text>}
             </Pressable>

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Dimensions, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,8 +30,21 @@ export default function ListDetail() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const deleteList = async () => {
-    await api.del(`/collections/${id}`);
-    router.back();
+    Alert.alert(
+      t('listDetail.deleteTitle'),
+      t('listDetail.deleteMsg', { name: list?.name || '' }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            await api.del(`/collections/${id}`);
+            router.back();
+          },
+        },
+      ],
+    );
   };
 
   const entries = list?.entries || [];

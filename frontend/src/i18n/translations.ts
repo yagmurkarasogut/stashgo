@@ -43,6 +43,8 @@ export const translations = {
       errRequired: `Email and password required`,
       errMin: `Password must be at least 6 characters`,
       errRegFailed: `Registration failed`,
+      consent: `I accept the Terms of Service and Privacy Policy & KVKK`,
+      errConsent: `Please accept the Terms and Privacy Policy`,
     },
     verify: {
       title: `Verify your email`,
@@ -91,8 +93,8 @@ export const translations = {
       noMoviesDetected: `No movies detected`,
       aiTitle: `Ask Stash Go`,
       aiPrompt: `Tell Stash Go what you feel like watching…`,
-      credits: `✨ {{n}} / {{max}} AI credits today`,
-      creditsPremium: `✨ Premium · Unlimited`,
+      credits: `✨ {{n}} / {{max}}\nAI credits`,
+      creditsPremium: `✨ Premium\nUnlimited`,
     },
     premium: {
       title: `Stash Go Premium`,
@@ -264,6 +266,8 @@ export const translations = {
       titleCount: `{{n}} titles`,
       addTitles: `Add titles from library`,
       empty: `This list is empty. Open any title and tap "Add to lists."`,
+      deleteTitle: `Delete list`,
+      deleteMsg: `"{{name}}" will be permanently deleted. This can't be undone.`,
     },
     listNew: {
       addTo: `Add to {{name}}`,
@@ -323,6 +327,8 @@ export const translations = {
       errRequired: `E-posta ve şifre gerekli`,
       errMin: `Şifre en az 6 karakter olmalı`,
       errRegFailed: `Kayıt başarısız`,
+      consent: `Kullanım Koşulları ve Gizlilik Politikası & KVKK'yı kabul ediyorum`,
+      errConsent: `Devam etmek için koşulları kabul edin`,
     },
     verify: {
       title: `E-postanı doğrula`,
@@ -371,8 +377,8 @@ export const translations = {
       noMoviesDetected: `Film tespit edilmedi`,
       aiTitle: `Stash Go'ya sor`,
       aiPrompt: `Ne izlemek istediğini anlat…`,
-      credits: `✨ Bugün {{n}} / {{max}} AI hakkı`,
-      creditsPremium: `✨ Premium · Sınırsız`,
+      credits: `✨ {{n}} / {{max}}\nAI hakkı`,
+      creditsPremium: `✨ Premium\nSınırsız`,
     },
     premium: {
       title: `Stash Go Premium`,
@@ -544,6 +550,8 @@ export const translations = {
       titleCount: `{{n}} içerik`,
       addTitles: `Kütüphaneden içerik ekle`,
       empty: `Bu liste boş. Herhangi bir içeriği açın ve "Listelere ekle"ye dokunun.`,
+      deleteTitle: `Listeyi sil`,
+      deleteMsg: `"{{name}}" listesi kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
     },
     listNew: {
       addTo: `{{name}} listesine ekle`,
