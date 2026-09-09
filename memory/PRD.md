@@ -180,3 +180,7 @@ Checkpoint before payments: git 77f53c5.
 - CAVEAT: real purchases only work on a native/dev or store build; Expo Go/web use RC Test Store
   (simulated). User must complete store-side IAP setup (FAQ in payments panel) for live purchases.
 
+
+### Stash Go 1.0 polish pass (checkpoint e6b1d7c)
+DONE+TESTED: onboarding copy "Nasıl çalışır?"/"How does it work?"; removed duplicate top-left onboarding logo (login/register logo kept); AI credit system backend (recommend=2, analysis=1, 5/day free, premium unlimited) curl-verified 5->3->2->0->402; GET /api/ai/usage returns credits; Home shows "✨ n/5 AI credits" badge (Premium=Sınırsız); Home+Library focus-refresh (fixes "0 KÜTÜPHANEDE" count + immediate sync), Lists already had it; Search (Ara) now routes to the SAME general AI (/ai-discover) instead of library-only /search; remove-from-library confirmation (native Alert, TR/EN copy) on movie detail; portrait-only + userInterfaceStyle=dark locked; TR nav terms already correct (Ana Sayfa/Kütüphane/Listeler/Ara/Profil); device-language default already via expo-localization.
+DEFERRED (needs dedicated pass, reported to user): #5 EMAIL VERIFICATION (required-verify flow + resend + gating) — larger auth change; #9 extra Library filter categories (metadata already on detail page); exhaustive QA of #14 back/close, #16 keyboard, #17 large-text, #18 offline messages, #19 permission rationale (existing behavior mostly compliant; not fully re-audited). NOTE: remove-confirm uses RN Alert (works on device, no-op on web preview).
