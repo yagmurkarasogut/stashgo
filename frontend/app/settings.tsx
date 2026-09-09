@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/src/api/client';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/context/ToastContext';
@@ -23,6 +24,24 @@ export default function Settings() {
   const [pwBusy, setPwBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
+  const [photoPerm, setPhotoPerm] = useState<{ granted: boolean; canAskAgain: boolean } | null>(null);
+
+  const refreshPhotoPerm = useCallback(async () => {
+    try {
+      const p = await ImagePicker.getMediaLibraryPermissionsAsync();
+      setPhotoPerm({ granted: p.granted, canAskAgain: p.canAskAgain });
+    } catch { /* noop */ }
+  }, []);
+
+  useFocusEffect(useCallback(() => { refreshPhotoPerm(); }, [refreshPhotoPerm]));
+
+  const handlePhotoPerm = async () => {
+    if (photoPerm?.granted) { Linking.openSettings(); return; }
+    if (photoPerm && !photoPerm.canAskAgain) { Linking.openSettings(); return; }
+    const res = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    setPhotoPerm({ granted: res.granted, canAskAgain: res.canAskAgain });
+    if (!res.granted && !res.canAskAgain) Linking.openSettings();
+  };
 
   const pickLang = async (l: 'tr' | 'en') => {
     await setLang(l);
@@ -85,6 +104,24 @@ export default function Settings() {
               </Pressable>
             ))}
           </View>
+        </View>
+
+        {/* Permissions */}
+        <View style={styles.card}>
+          <Text style={styles.label}>{t('settings.permsTitle')}</Text>
+          <View style={styles.permRow}>
+            <Ionicons name="image-outline" size={20} color={colors.brand} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.permName}>{t('settings.permPhotos')}</Text>
+              <Text style={styles.permDesc}>{t('settings.permPhotosDesc')}</Text>
+            </View>
+          </View>
+          <Pressable testID="settings-photo-perm" onPress={handlePhotoPerm} style={[styles.permBtn, photoPerm?.granted && styles.permBtnGranted]}>
+            <Ionicons name={photoPerm?.granted ? 'checkmark-circle' : 'lock-open-outline'} size={16} color={photoPerm?.granted ? colors.success : colors.brand} />
+            <Text style={[styles.permBtnText, photoPerm?.granted && { color: colors.success }]}>
+              {photoPerm?.granted ? `${t('settings.permGranted')} · ${t('settings.permManage')}` : (photoPerm && !photoPerm.canAskAgain ? t('settings.permManage') : t('settings.permGrant'))}
+            </Text>
+          </Pressable>
         </View>
 
         {/* Change password */}
@@ -161,4 +198,10 @@ const styles = StyleSheet.create({
   dangerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.error, borderRadius: radius.sm, paddingVertical: 12, marginTop: spacing.xs },
   dangerText: { color: colors.error, fontWeight: '700', fontSize: 13 },
   dangerConfirm: { color: colors.onSurface, fontSize: 13, fontWeight: '600' },
+  permRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.sm },
+  permName: { color: colors.onSurface, fontSize: 14, fontWeight: '700' },
+  permDesc: { color: colors.onSurfaceTertiary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  permBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.sm, paddingVertical: 11 },
+  permBtnGranted: { borderColor: colors.success },
+  permBtnText: { color: colors.brand, fontWeight: '700', fontSize: 13 },
 });

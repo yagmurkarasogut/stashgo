@@ -1,6 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LogBox, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { useIconFonts } from '@/src/hooks/use-icon-fonts';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { ToastProvider } from '@/src/context/ToastContext';
 import { I18nProvider, useI18n } from '@/src/i18n';
+import { loadPermPrimed, getPermPrimed } from '@/src/lib/appFlags';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Purchases from 'react-native-purchases';
 import { initializeRevenueCat, SubscriptionProvider, rcEnabled } from '@/src/lib/revenuecat';
@@ -31,6 +32,11 @@ function AuthGate() {
   const { ready } = useI18n();
   const segments = useSegments();
   const router = useRouter();
+  const [permReady, setPermReady] = useState(false);
+
+  useEffect(() => {
+    loadPermPrimed().then(() => setPermReady(true));
+  }, []);
 
   // Bind RevenueCat identity to the stable backend user id on every auth path.
   useEffect(() => {
@@ -49,9 +55,10 @@ function AuthGate() {
   }, [user?.user_id]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !permReady) return;
     const inAuth = segments[0] === '(auth)';
     const onVerify = segments[1] === 'verify';
+    const onPerms = segments[0] === 'permissions';
     const needsVerify = !!user && user.auth_provider === 'email' && user.email_verified === false;
     if (!user && !inAuth) {
       router.replace('/(auth)/login');
@@ -59,10 +66,12 @@ function AuthGate() {
       router.replace('/(auth)/verify');
     } else if (user && !needsVerify && inAuth) {
       router.replace('/(tabs)');
+    } else if (user && !needsVerify && !inAuth && !onPerms && !getPermPrimed()) {
+      router.replace('/permissions');
     }
-  }, [user, loading, segments, router]);
+  }, [user, loading, segments, router, permReady]);
 
-  if (loading || !ready) {
+  if (loading || !ready || !permReady) {
     return (
       <View style={styles.loading} testID="app-loading">
         <ActivityIndicator color={colors.brand} size="large" />
@@ -72,6 +81,7 @@ function AuthGate() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
       <Stack.Screen name="(auth)" />
+      <Stack.Screen name="permissions" options={{ animation: 'fade' }} />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="add-discovery" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="ai-discover" options={{ animation: 'slide_from_right' }} />

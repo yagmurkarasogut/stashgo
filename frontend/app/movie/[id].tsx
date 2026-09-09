@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Platform, Alert, PanResponder } from 'react-native';
 import { Image } from 'expo-image';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,8 +29,43 @@ export default function MovieDetail() {
   const [newListName, setNewListName] = useState('');
   const [creatingList, setCreatingList] = useState(false);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [libIds, setLibIds] = useState<string[]>([]);
   const toast = useToast();
   const t = useT();
+
+  // Library order for swipe navigation (previous / next card).
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api.get<LibraryEntry[]>('/library?sort=recent');
+        setLibIds(data.map((e) => e.entry_id));
+      } catch (e) { console.warn('lib order load failed', e); }
+    })();
+  }, []);
+
+  const curIndex = libIds.indexOf(String(id));
+  const hasPrev = curIndex > 0;
+  const hasNext = curIndex >= 0 && curIndex < libIds.length - 1;
+
+  const goTo = useCallback((delta: number) => {
+    if (curIndex < 0) return;
+    const target = libIds[curIndex + delta];
+    if (target) router.replace(`/movie/${target}`);
+  }, [curIndex, libIds, router]);
+
+  const goToRef = React.useRef(goTo);
+  goToRef.current = goTo;
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, g) =>
+        Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+      onPanResponderRelease: (_evt, g) => {
+        if (g.dx <= -60) goToRef.current(1);
+        else if (g.dx >= 60) goToRef.current(-1);
+      },
+    }),
+  ).current;
 
   const loadLists = useCallback(async () => {
     try {
@@ -108,7 +143,7 @@ export default function MovieDetail() {
   }
 
   return (
-    <View style={styles.root} testID="movie-detail-screen">
+    <View style={styles.root} testID="movie-detail-screen" {...(showTrailer ? {} : panResponder.panHandlers)}>
       <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
         <View style={styles.heroWrap}>
           {showTrailer && entry.trailer_key ? (
@@ -138,6 +173,16 @@ export default function MovieDetail() {
               {entry.trailer_key ? (
                 <Pressable testID="detail-play-trailer" onPress={() => setShowTrailer(true)} style={styles.playBtn}>
                   <Ionicons name="play" size={26} color={colors.onBrand} style={{ marginLeft: 3 }} />
+                </Pressable>
+              ) : null}
+              {hasPrev ? (
+                <Pressable testID="detail-prev" onPress={() => goTo(-1)} style={[styles.navBtn, styles.navPrev]}>
+                  <Ionicons name="chevron-back" size={22} color={colors.onSurface} />
+                </Pressable>
+              ) : null}
+              {hasNext ? (
+                <Pressable testID="detail-next" onPress={() => goTo(1)} style={[styles.navBtn, styles.navNext]}>
+                  <Ionicons name="chevron-forward" size={22} color={colors.onSurface} />
                 </Pressable>
               ) : null}
               <View style={styles.heroContent}>
@@ -315,6 +360,9 @@ const styles = StyleSheet.create({
   hero: { ...StyleSheet.absoluteFillObject },
   backBtn: { position: 'absolute', left: spacing.md, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 5 },
   playBtn: { position: 'absolute', alignSelf: 'center', top: '38%', width: 64, height: 64, borderRadius: 32, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
+  navBtn: { position: 'absolute', top: 180, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', zIndex: 5 },
+  navPrev: { left: spacing.md },
+  navNext: { right: spacing.md },
   provider: { width: 72, alignItems: 'center' },
   providerLogo: { width: 48, height: 48, borderRadius: radius.sm, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border },
   providerName: { color: colors.onSurface, fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
