@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ScrollView, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, LibraryEntry } from '@/src/api/client';
@@ -62,7 +62,7 @@ export default function Library() {
     }
   }, [typeF, statusF, genreF, sort]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const sortLabel = SORTS.find((s) => s.key === sort)?.labelKey;
   const sortText = sortLabel ? t(sortLabel) : t('library.sort');
