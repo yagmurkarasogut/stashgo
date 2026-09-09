@@ -44,6 +44,14 @@ export const translations = {
       errMin: `Password must be at least 6 characters`,
       errRegFailed: `Registration failed`,
     },
+    verify: {
+      title: `Verify your email`,
+      body: `Click the verification link we sent to your email to continue.`,
+      resend: `Resend verification email`,
+      recheck: `I've verified, check again`,
+      resent: `Verification email sent.`,
+      notYet: `Not verified yet — check your inbox, then tap again.`,
+    },
     forgot: {
       title: `Reset password`,
       subtitle: `Enter your account email and we'll send you a reset link.`,
@@ -315,6 +323,14 @@ export const translations = {
       errRequired: `E-posta ve şifre gerekli`,
       errMin: `Şifre en az 6 karakter olmalı`,
       errRegFailed: `Kayıt başarısız`,
+    },
+    verify: {
+      title: `E-postanı doğrula`,
+      body: `Devam etmek için e-posta adresine gönderdiğimiz doğrulama bağlantısına tıkla.`,
+      resend: `Doğrulama e-postasını tekrar gönder`,
+      recheck: `Doğruladım, tekrar kontrol et`,
+      resent: `Doğrulama e-postası gönderildi.`,
+      notYet: `Henüz doğrulanmadı — gelen kutunu kontrol edip tekrar dokun.`,
     },
     forgot: {
       title: `Şifre sıfırlama`,

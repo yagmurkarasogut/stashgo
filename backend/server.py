@@ -16,6 +16,7 @@ import bcrypt
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request
+from fastapi.responses import HTMLResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -78,6 +79,7 @@ class UserPublic(BaseModel):
     picture: Optional[str] = None
     auth_provider: str
     role: str = "user"
+    email_verified: bool = True
     created_at: datetime
 
 
@@ -222,6 +224,7 @@ def _to_public(user: Dict) -> Dict:
         "picture": user.get("picture"),
         "auth_provider": user.get("auth_provider", "email"),
         "role": user.get("role", "user"),
+        "email_verified": user.get("email_verified", True),
         "created_at": user["created_at"],
     }
 
@@ -242,9 +245,11 @@ async def register(body: UserRegister):
         "password_hash": pw_hash,
         "auth_provider": "email",
         "role": "user",
+        "email_verified": False,
         "created_at": now_utc(),
     }
     await db.users.insert_one(user_doc)
+    await _send_verification_email(user_doc, "en")
     token = await create_session(user_id)
     return {"session_token": token, "user": _to_public(user_doc)}
 
@@ -415,6 +420,79 @@ async def reset_password(body: ResetPasswordBody):
     await db.password_resets.delete_many({"user_id": rec["user_id"]})
     await db.user_sessions.delete_many({"user_id": rec["user_id"]})
     return {"ok": True}
+
+
+VERIFY_BASE = os.environ.get("PUBLIC_BACKEND_URL", "https://media-vault-api.emergent.host")
+
+
+async def _send_verification_email(user: Dict, lang: str = "en") -> None:
+    if not email_svc.is_configured():
+        logger.warning("Verification requested but email service not configured")
+        return
+    token = secrets.token_urlsafe(32)
+    await db.email_verifications.delete_many({"user_id": user["user_id"]})
+    await db.email_verifications.insert_one({
+        "user_id": user["user_id"],
+        "email": user["email"],
+        "token": token,
+        "expires_at": now_utc() + timedelta(hours=24),
+        "created_at": now_utc(),
+    })
+    link = f"{VERIFY_BASE}/api/auth/verify-email?token={token}"
+    subject, html = email_svc.verify_email(user.get("name") or "", link, lang)
+    try:
+        await email_svc.send_email(to=user["email"], subject=subject, html=html)
+    except HTTPException:
+        pass
+
+
+def _verify_page(title: str, body: str) -> HTMLResponse:
+    html = (
+        f"<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{title}</title></head>"
+        f"<body style='background:#0B0D10;color:#fff;font-family:-apple-system,Arial,sans-serif;"
+        f"display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center'>"
+        f"<div style='max-width:420px;padding:24px'><h2 style='color:#F5A623'>{title}</h2>"
+        f"<p style='color:#c7ccd1;line-height:1.5'>{body}</p></div></body></html>"
+    )
+    return HTMLResponse(content=html)
+
+
+@api.get("/auth/verify-email")
+async def verify_email_link(token: str):
+    rec = await db.email_verifications.find_one({"token": token})
+    if not rec:
+        return _verify_page("Link geçersiz / Invalid link",
+                            "Bağlantı geçersiz veya kullanılmış. Uygulamadan tekrar gönderin.<br>"
+                            "This link is invalid or already used. Please resend from the app.")
+    exp = rec["expires_at"]
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now_utc():
+        await db.email_verifications.delete_one({"_id": rec["_id"]})
+        return _verify_page("Süresi doldu / Expired",
+                            "Doğrulama bağlantısının süresi doldu. Uygulamadan yeni bir tane gönderin.<br>"
+                            "Verification link expired. Please resend from the app.")
+    await db.users.update_one({"user_id": rec["user_id"]}, {"$set": {"email_verified": True}})
+    await db.email_verifications.delete_many({"user_id": rec["user_id"]})
+    return _verify_page("E-posta doğrulandı ✓ / Email verified ✓",
+                        "Harika! Uygulamaya dönüp \"Doğruladım, tekrar kontrol et\"e dokunabilirsin.<br>"
+                        "All set! Return to the app and tap \"I've verified, check again\".")
+
+
+class ResendVerificationBody(BaseModel):
+    email: EmailStr
+    lang: Optional[str] = "en"
+
+
+@api.post("/auth/resend-verification")
+async def resend_verification(body: ResendVerificationBody):
+    generic = {"ok": True}
+    user = await db.users.find_one({"email": body.email.lower(), "deleted_at": {"$exists": False}})
+    if not user or user.get("auth_provider") != "email" or user.get("email_verified"):
+        return generic
+    await _send_verification_email(user, body.lang or "en")
+    return generic
 
 
 @api.get("/auth/me", response_model=UserPublic)

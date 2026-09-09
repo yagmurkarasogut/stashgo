@@ -91,6 +91,8 @@ export type User = {
   name?: string;
   picture?: string;
   auth_provider: string;
+  role?: string;
+  email_verified?: boolean;
   created_at: string;
 };
 

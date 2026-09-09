@@ -69,7 +69,13 @@ export default function Home() {
             <Text style={styles.name}>{user?.name || user?.email?.split('@')[0]}</Text>
           </View>
           <View style={styles.stats}>
-            <View style={styles.statPill}><Text style={styles.statNum}>{library.length}</Text><Text style={styles.statLabel}>{t('home.inVault')}</Text></View>
+            <Pressable testID="home-ai-credits" onPress={() => router.push('/paywall')} style={styles.creditCapsule}>
+              <Text style={styles.creditCapsuleText} numberOfLines={1}>
+                {usage
+                  ? (usage.unlimited ? t('home.creditsPremium') : t('home.credits', { n: Math.max(0, usage.limit - usage.used), max: usage.limit }))
+                  : '✨ …'}
+              </Text>
+            </Pressable>
           </View>
         </View>
 
@@ -83,15 +89,7 @@ export default function Home() {
               <Text style={styles.aiTitle}>{t('home.aiTitle')}</Text>
               <Text style={styles.aiPrompt} numberOfLines={1}>{t('home.aiPrompt')}</Text>
             </View>
-            {usage ? (
-              <View style={styles.creditPill} testID="home-ai-credits">
-                <Text style={styles.creditText} numberOfLines={1}>
-                  {usage.unlimited ? t('home.creditsPremium') : t('home.credits', { n: Math.max(0, usage.limit - usage.used), max: usage.limit })}
-                </Text>
-              </View>
-            ) : (
-              <Ionicons name="arrow-forward" size={18} color={colors.onSurfaceTertiary} />
-            )}
+            <Ionicons name="arrow-forward" size={18} color={colors.onSurfaceTertiary} />
           </Pressable>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.aiChipRow}>
             {['discover.c1', 'discover.c3', 'discover.c4', 'discover.c5'].map((k) => (
@@ -110,7 +108,10 @@ export default function Home() {
         {/* Hero recent library carousel */}
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>{t('home.yourVault')}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.sectionTitle}>{t('home.yourVault')}</Text>
+              <Text style={styles.libCount} testID="home-lib-count">{t('lists.titleCount', { n: library.length })}</Text>
+            </View>
             <Pressable testID="home-see-all-library" onPress={() => router.push('/(tabs)/library')}>
               <Text style={styles.link}>{t('home.seeAll')}</Text>
             </Pressable>
@@ -255,6 +256,10 @@ const styles = StyleSheet.create({
   creditPill: { backgroundColor: colors.surfaceTertiary, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 5, maxWidth: 130 },
   creditText: { color: colors.brand, fontSize: 11, fontWeight: '700' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  libCount: { color: colors.onSurfaceTertiary, fontSize: 12, fontWeight: '600' },
+  creditCapsule: { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 8, maxWidth: 190 },
+  creditCapsuleText: { color: colors.brand, fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
   sectionTitle: { color: colors.onSurface, fontSize: 18, fontWeight: '600' },
   link: { color: colors.brand, fontSize: 13, fontWeight: '600' },
   badge: { color: colors.onSurfaceTertiary, fontSize: 12 },

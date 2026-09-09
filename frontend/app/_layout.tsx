@@ -51,9 +51,13 @@ function AuthGate() {
   useEffect(() => {
     if (loading) return;
     const inAuth = segments[0] === '(auth)';
+    const onVerify = segments[1] === 'verify';
+    const needsVerify = !!user && user.auth_provider === 'email' && user.email_verified === false;
     if (!user && !inAuth) {
       router.replace('/(auth)/login');
-    } else if (user && inAuth) {
+    } else if (needsVerify && !onVerify) {
+      router.replace('/(auth)/verify');
+    } else if (user && !needsVerify && inAuth) {
       router.replace('/(tabs)');
     }
   }, [user, loading, segments, router]);

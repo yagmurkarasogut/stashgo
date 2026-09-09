@@ -161,3 +161,43 @@ def reset_code_email(name: str, code: str, lang: str) -> tuple[str, str]:
             '</td></tr></table>'
         )
     return subject, html
+
+
+def verify_email(name: str, link: str, lang: str) -> tuple[str, str]:
+    """Subject + html for the account verification email. Contains a single https link
+    to the app's own backend verify endpoint; asks for nothing back."""
+    safe_name = escape(name or "")
+    safe_link = escape(link)
+    if lang == "tr":
+        subject = "Stash Go e-posta doğrulama"
+        html = (
+            '<table role="presentation" width="100%"><tr><td style="padding:24px;'
+            'font-family:Arial,sans-serif;color:#111">'
+            f'<p>Merhaba {safe_name},</p>'
+            '<p>Stash Go hesabını etkinleştirmek için e-posta adresini doğrula:</p>'
+            f'<p><a href="{safe_link}" style="display:inline-block;background:#F5A623;'
+            'color:#111;padding:12px 20px;border-radius:8px;text-decoration:none;'
+            'font-weight:bold">E-postamı doğrula</a></p>'
+            '<p>Bu bağlantı 24 saat içinde geçerliliğini yitirir. Bu isteği sen yapmadıysan '
+            'bu e-postayı yok sayabilirsin.</p>'
+            '<p style="font-size:12px;color:#888">Stash Go tarafından gönderildi. Şifreni veya '
+            'kart bilgilerini asla e-posta ile istemeyiz.</p>'
+            '</td></tr></table>'
+        )
+    else:
+        subject = "Verify your Stash Go email"
+        html = (
+            '<table role="presentation" width="100%"><tr><td style="padding:24px;'
+            'font-family:Arial,sans-serif;color:#111">'
+            f'<p>Hi {safe_name},</p>'
+            '<p>Confirm your email to activate your Stash Go account:</p>'
+            f'<p><a href="{safe_link}" style="display:inline-block;background:#F5A623;'
+            'color:#111;padding:12px 20px;border-radius:8px;text-decoration:none;'
+            'font-weight:bold">Verify my email</a></p>'
+            '<p>This link expires in 24 hours. If you did not request this, you can ignore '
+            'this email.</p>'
+            '<p style="font-size:12px;color:#888">Sent by Stash Go. We never ask for your '
+            'password or card details by email.</p>'
+            '</td></tr></table>'
+        )
+    return subject, html
